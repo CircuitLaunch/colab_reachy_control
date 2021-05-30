@@ -12,11 +12,10 @@
 #include <vector>
 #include <colab_reachy_control/Trajectory.h>
 #include <sensor_msgs/JointState.h>
-#include "ParametizingBSpline.hpp"
-#include "SerialStream.hpp"
+#include "BSpline/BSpline.hpp"
+#include "BSpline/Parametizer.hpp"
 
 using namespace std;
-using namespace ass;
 using namespace sensor_msgs;
 
 enum
@@ -60,7 +59,8 @@ class Interpolator
     float jointState[8];
     float goalTimeTol;
 
-    ParametizingBSpline spline;
+    BSpline spline;
+    Parametizer parametizer;
 
     int divisions;
     vector<float> parametization;
@@ -76,6 +76,7 @@ Interpolator::Interpolator(ros::NodeHandle &iNH, const string &iJointStateTopic,
   trajectorySub(nh.subscribe<const colab_reachy_control::Trajectory &, Interpolator>(iTrajectoryTopic, iQueueSize, &Interpolator::launchTrajectory, this)),
   jointNames(iJointNames),
   spline(controlPoints, knots, 100),
+  parametizer(spline),
   interpolating(false)
 { }
 
@@ -92,10 +93,11 @@ void Interpolator::launchTrajectory(const colab_reachy_control::Trajectory &iTra
     controlPoints[floatCount] = iTraj.control_points[floatCount];
   }
 
-  spline.initialize(jointCount, controlPointCount);
+  spline.init(jointCount, controlPointCount);
+  parametizer.init();
 
   divisions = int(goalTimeTol / 0.06666666); // 15 frames a second
-  parametization = spline.parametizeSigmoidal(divisions);
+  parametization = parametizer.parametizeSigmoidal(divisions);
 
   ostringstream ss;
   bool first = true;
@@ -119,8 +121,8 @@ void Interpolator::tick(ros::Time &t)
     if(newParamIndex < divisions) {
       if(newParamIndex > paramIndex) {
         float currentParam = parametization[newParamIndex];
-        ROS_INFO("newParamIndex: %d, currentParam: %f", newParamIndex, currentParam);
         spline.eval(currentParam, jointState);
+        ROS_INFO("%d: %f (%f, %f, %f, %f, %f, %f, %f, %f)", newParamIndex, currentParam, jointState[0], jointState[1], jointState[2], jointState[3], jointState[4], jointState[5], jointState[6], jointState[7]);
         paramIndex = newParamIndex;
       }
     } else {
