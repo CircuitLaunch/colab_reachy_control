@@ -1,2 +1,2 @@
 # colab_reachy_control
-Reachy ROS-Arduino interface
+Reachy U2D2 ROS interface
