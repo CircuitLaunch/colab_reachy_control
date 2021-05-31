@@ -77,6 +77,8 @@ bool Interpolator::trajectoryService(colab_reachy_control::TrajectoryService::Re
   int controlPointCount = iReq.control_points.size() / jointCount;
   float knots[controlPointCount + 4];
 
+  // TODO: create additional control points if the provided count less than 4
+
   #if DEBUG
   {
     ostringstream ss;
@@ -154,6 +156,7 @@ bool Interpolator::trajectoryService(colab_reachy_control::TrajectoryService::Re
 
 void Interpolator::drive(vector<int> &dxl_ids, float *iJointState)
 {
+  // TODO: Use sync write if actually connected to a real controller
   for(int i = 0; i < dxl_ids.size(); i++) {
     int id = dxl_ids[i];
     DXL &actuator = dxl.getDXL(uint8_t(id));
