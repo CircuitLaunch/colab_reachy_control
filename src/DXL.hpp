@@ -19,7 +19,8 @@ enum {
   MODEL_NUMBER_MX106 = 320,
   MODEL_NUMBER_MX28_2 = 30,
   MODEL_NUMBER_MX64_2 = 311,
-  MODEL_NUMBER_MX106_2 = 321
+  MODEL_NUMBER_MX106_2 = 321,
+  MODEL_NUMBER_DUMMY = 65535
 };
 
 enum {
@@ -132,14 +133,17 @@ class DXLPort : public DXLErrorHandler
 template <typename T>
 int DXLPort::syncWrite(uint16_t iRegister, uint16_t iDataLen, unordered_map<uint8_t, T> &iData)
 {
-  syncWriteInit(iRegister, iDataLen);
-  typename unordered_map<uint8_t, T>::iterator i;
-  for(i = iData.begin(); i != iData.end(); i++) {
-    uint8_t id = i->first;
-    uint32_t value = i->second;
-    syncWritePush<T>(actuators[id], value);
+  if(portHandler && packetHandler) {
+    syncWriteInit(iRegister, iDataLen);
+    typename unordered_map<uint8_t, T>::iterator i;
+    for(i = iData.begin(); i != iData.end(); i++) {
+      uint8_t id = i->first;
+      uint32_t value = i->second;
+      syncWritePush<T>(actuators[id], value);
+    }
+    return syncWriteComplete();
   }
-  return syncWriteComplete();
+  return COMM_SUCCESS;
 }
 
 template <typename T>
@@ -161,66 +165,67 @@ class DXL
 
   public:
     DXL(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler);
+    virtual ~DXL();
 
-    uint8_t getFirmwareVersion();
+    virtual uint8_t getFirmwareVersion();
 
-    uint8_t getReturnDelayTime();
-    void setReturnDelayTime(uint8_t);
+    virtual uint8_t getReturnDelayTime();
+    virtual void setReturnDelayTime(uint8_t);
 
-    float getCWAngleLimit();
-    void setCWAngleLimit(float iAngle);
+    virtual float getCWAngleLimit();
+    virtual void setCWAngleLimit(float iAngle);
 
-    float getCCWAngleLimit();
-    void setCCWAngleLimit(float iAngle);
+    virtual float getCCWAngleLimit();
+    virtual void setCCWAngleLimit(float iAngle);
 
-    uint8_t getTemperatureLimit();
+    virtual uint8_t getTemperatureLimit();
 
-    uint8_t getMinVoltageLimit();
-    void setMinVoltageLimit(uint8_t iVolts);
+    virtual uint8_t getMinVoltageLimit();
+    virtual void setMinVoltageLimit(uint8_t iVolts);
 
-    uint8_t getMaxVoltageLimit();
-    void setMaxVoltageLimit(uint8_t iVolts);
+    virtual uint8_t getMaxVoltageLimit();
+    virtual void setMaxVoltageLimit(uint8_t iVolts);
 
-    uint16_t getMaxTorque();
-    void setMaxTorque(uint16_t iTorque);
+    virtual uint16_t getMaxTorque();
+    virtual void setMaxTorque(uint16_t iTorque);
 
-    uint8_t getStatusReturnLevel();
-    void setStatusReturnLevel(uint8_t iLevel);
+    virtual uint8_t getStatusReturnLevel();
+    virtual void setStatusReturnLevel(uint8_t iLevel);
 
-    uint8_t getShutdown();
-    void setShutdown(uint8_t iFlags);
+    virtual uint8_t getShutdown();
+    virtual void setShutdown(uint8_t iFlags);
 
-    uint8_t getAlarmLED();
-    void setAlarmLED(uint8_t iFlags);
+    virtual uint8_t getAlarmLED();
+    virtual void setAlarmLED(uint8_t iFlags);
 
-    uint8_t getTorqueEnable();
-    void setTorqueEnable(uint8_t iEnable);
+    virtual uint8_t getTorqueEnable();
+    virtual void setTorqueEnable(uint8_t iEnable);
 
-    uint8_t getLED();
-    void setLED(uint8_t iBool);
+    virtual uint8_t getLED();
+    virtual void setLED(uint8_t iBool);
 
-    float getGoalPosition();
-    void setGoalPosition(float iAngle);
+    virtual float getGoalPosition();
+    virtual void setGoalPosition(float iAngle);
 
-    uint16_t getMovingSpeed();
-    void setMovingSpeed(uint16_t iAnglePerSec);
+    virtual uint16_t getMovingSpeed();
+    virtual void setMovingSpeed(uint16_t iAnglePerSec);
 
-    uint16_t getTorqueLimit();
-    void setTorqueLimit(uint16_t iTorque);
+    virtual uint16_t getTorqueLimit();
+    virtual void setTorqueLimit(uint16_t iTorque);
 
-    float getPresentPosition();
-    uint16_t getPresentSpeed();
-    uint16_t getPresentLoad();
-    uint8_t getPresentVoltage();
-    uint8_t getPresentTemperature();
-    uint8_t getRegistered();
-    uint8_t getMoving();
+    virtual float getPresentPosition();
+    virtual uint16_t getPresentSpeed();
+    virtual uint16_t getPresentLoad();
+    virtual uint8_t getPresentVoltage();
+    virtual uint8_t getPresentTemperature();
+    virtual uint8_t getRegistered();
+    virtual uint8_t getMoving();
 
-    uint8_t getLock();
-    void setLock(uint8_t iBool);
+    virtual uint8_t getLock();
+    virtual void setLock(uint8_t iBool);
 
-    uint16_t getPunch();
-    void setPunch(uint16_t iPunch);
+    virtual uint16_t getPunch();
+    virtual void setPunch(uint16_t iPunch);
 
   protected:
     virtual float getStepResolution() = 0;
@@ -233,8 +238,8 @@ class DXL
     template <typename T>
     T convertForRead(uint8_t iRegister, uint32_t iValue);
 
-    uint16_t fromAngle(float iAngle, float useOffset = 1.0);
-    float toAngle(uint16_t iSteps, float useOffset = 1.0);
+    virtual uint16_t fromAngle(float iAngle, float useOffset = 1.0);
+    virtual float toAngle(uint16_t iSteps, float useOffset = 1.0);
 
   protected:
     DXLPort &port;
@@ -341,4 +346,79 @@ class DXL_MX64 : public DXL_MX
     void setTorqueCtlModeEnable(uint8_t iEnable);
     uint16_t getTorque();
     void setTorque(uint16_t iTorque);
+};
+
+class DXL_DUMMY : public DXL
+{
+  public:
+    DXL_DUMMY(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler)
+    : DXL(iPort, iId, iModel, iErrorHandler) { }
+    virtual ~DXL_DUMMY();
+
+    virtual uint8_t getFirmwareVersion() { return 0; }
+
+    virtual uint8_t getReturnDelayTime() { return 0; }
+    virtual void setReturnDelayTime(uint8_t) { }
+
+    virtual float getCWAngleLimit() { return 0; }
+    virtual void setCWAngleLimit(float iAngle) { }
+
+    virtual float getCCWAngleLimit() { return 0; }
+    virtual void setCCWAngleLimit(float iAngle) { }
+
+    virtual uint8_t getTemperatureLimit() { return 0; }
+
+    virtual uint8_t getMinVoltageLimit() { return 0; }
+    virtual void setMinVoltageLimit(uint8_t iVolts) { }
+
+    virtual uint8_t getMaxVoltageLimit() { return 0; }
+    virtual void setMaxVoltageLimit(uint8_t iVolts) { }
+
+    virtual uint16_t getMaxTorque() { return 0; }
+    virtual void setMaxTorque(uint16_t iTorque) { }
+
+    virtual uint8_t getStatusReturnLevel() { return 0; }
+    virtual void setStatusReturnLevel(uint8_t iLevel) { }
+
+    virtual uint8_t getShutdown() { return 0; }
+    virtual void setShutdown(uint8_t iFlags) { }
+
+    virtual uint8_t getAlarmLED() { return 0; }
+    virtual void setAlarmLED(uint8_t iFlags) { }
+
+    virtual uint8_t getTorqueEnable() { return 0; }
+    virtual void setTorqueEnable(uint8_t iEnable) { }
+
+    virtual uint8_t getLED() { return 0; }
+    virtual void setLED(uint8_t iBool) { }
+
+    virtual float getGoalPosition() { return position; }
+    virtual void setGoalPosition(float iAngle) { position = iAngle; }
+
+    virtual uint16_t getMovingSpeed() { return 0; }
+    virtual void setMovingSpeed(uint16_t iAnglePerSec) { }
+
+    virtual uint16_t getTorqueLimit() { return 0; }
+    virtual void setTorqueLimit(uint16_t iTorque) { }
+
+    virtual float getPresentPosition() { return position; }
+    virtual uint16_t getPresentSpeed() { return 0; }
+    virtual uint16_t getPresentLoad() { return 0; }
+    virtual uint8_t getPresentVoltage() { return 0; }
+    virtual uint8_t getPresentTemperature() { return 0; }
+    virtual uint8_t getRegistered() { return 0; }
+    virtual uint8_t getMoving() { return 0; }
+
+    virtual uint8_t getLock() { return 0; }
+    virtual void setLock(uint8_t iBool) { }
+
+    virtual uint16_t getPunch() { return 0; }
+    virtual void setPunch(uint16_t iPunch) { }
+
+  protected:
+    virtual float getStepResolution() { return 0.29; }
+    virtual uint16_t getCenterOffset() { return 512; }
+
+  protected:
+    float position;
 };

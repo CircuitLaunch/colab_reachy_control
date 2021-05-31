@@ -3,20 +3,29 @@
 DXLPort::DXLPort(const string &iAddress, int iBaud)
 {
   portHandler = dxl::PortHandler::getPortHandler(iAddress.c_str());
-  if(portHandler == nullptr)
-    throw invalid_argument("Failed to open port to Dynamixel controller");
 
-  portHandler->openPort();
-  portHandler->setBaudRate(iBaud);
-
-  packetHandler = dxl::PacketHandler::getPacketHandler(1.0);
-  if(packetHandler == nullptr)
-    throw invalid_argument("Failed to obtain packet handler for Dynamixel protocol 1.0");
+  if(portHandler->openPort()) {
+    if(portHandler->setBaudRate(iBaud)) {
+      packetHandler = dxl::PacketHandler::getPacketHandler(1.0);
+      if(!packetHandler)
+        throw invalid_argument("Failed to obtain packet handler for Dynamixel protocol 1.0");
+    } else {
+      delete portHandler;
+      throw invalid_argument("Invalid baud rate");
+    }
+  } else {
+    delete portHandler;
+    portHandler = nullptr;
+  }
 }
 
 DXLPort::~DXLPort()
 {
-  if(portHandler) portHandler->closePort();
+  if(portHandler) {
+    portHandler->closePort();
+    delete portHandler;
+    portHandler = nullptr;
+  }
   while(actuators.size()) {
     auto i = actuators.begin();
     actuators.erase(i);
@@ -45,40 +54,40 @@ DXL &DXLPort::getDXL(uint8_t iId, DXLErrorHandler &iErrorHandler)
   if(i != actuators.end())
     return *(i->second);
 
-  uint16_t model;
-  uint8_t error;
-  int result = getModel(iId, model, error);
-  if(result != COMM_SUCCESS)
-    throw invalid_argument("Failed to get model for actuator");
-
-  DXL *newDXL;
-  switch(model) {
-    case MODEL_NUMBER_AX12A:
-    case MODEL_NUMBER_AX12W:
-    case MODEL_NUMBER_AX18A:
-    case MODEL_NUMBER_RX10:
-    case MODEL_NUMBER_RX24F:
-    case MODEL_NUMBER_RX28:
-    case MODEL_NUMBER_RX64:
-      newDXL = new DXL_AX(*this, iId, model, iErrorHandler);
-      break;
-    case MODEL_NUMBER_EX106:
-      newDXL = new DXL_EX(*this, iId, model, iErrorHandler);
-      break;
-    case MODEL_NUMBER_MX12W:
-    case MODEL_NUMBER_MX28:
-      newDXL = new DXL_MX(*this, iId, model, iErrorHandler);
-      break;
-    case MODEL_NUMBER_MX64:
-    case MODEL_NUMBER_MX106:
-      newDXL = new DXL_MX64(*this, iId, model, iErrorHandler);
-      break;
-    default:
-      throw invalid_argument("Unsupported model");
+  DXL *newDXL = nullptr;
+  if(portHandler) {
+    uint16_t model;
+    uint8_t error;
+    int result = getModel(iId, model, error);
+    if(result == COMM_SUCCESS) {
+      switch(model) {
+        case MODEL_NUMBER_AX12A:
+        case MODEL_NUMBER_AX12W:
+        case MODEL_NUMBER_AX18A:
+        case MODEL_NUMBER_RX10:
+        case MODEL_NUMBER_RX24F:
+        case MODEL_NUMBER_RX28:
+        case MODEL_NUMBER_RX64:
+          newDXL = new DXL_AX(*this, iId, model, iErrorHandler);
+          break;
+        case MODEL_NUMBER_EX106:
+          newDXL = new DXL_EX(*this, iId, model, iErrorHandler);
+          break;
+        case MODEL_NUMBER_MX12W:
+        case MODEL_NUMBER_MX28:
+          newDXL = new DXL_MX(*this, iId, model, iErrorHandler);
+          break;
+        case MODEL_NUMBER_MX64:
+        case MODEL_NUMBER_MX106:
+          newDXL = new DXL_MX64(*this, iId, model, iErrorHandler);
+          break;
+      }
+    }
   }
-
+  if(!newDXL) {
+    newDXL = new DXL_DUMMY(*this, iId, MODEL_NUMBER_DUMMY, iErrorHandler);
+  }
   actuators[iId] = newDXL;
-
   return *newDXL;
 }
 
@@ -122,6 +131,9 @@ void DXLPort::handleError(DXL &iActuator, uint8_t iCommResult, uint8_t iErrorSta
 
 DXL::DXL(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler)
 : port(iPort), id(iId), model(iModel), errorHandler(iErrorHandler)
+{ }
+
+DXL::~DXL()
 { }
 
 uint8_t DXL::getFirmwareVersion()
@@ -646,3 +658,6 @@ void DXL_MX64::setTorque(uint16_t iValue)
   result = port.writeUInt16(id, MX64_RAM_GOAL_TORQUE, iValue, error);
   errorHandler.handleError(*this, result, error);
 }
+
+DXL_DUMMY::~DXL_DUMMY()
+{ }
