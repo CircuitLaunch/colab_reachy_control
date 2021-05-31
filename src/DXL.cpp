@@ -1,12 +1,17 @@
 #include "DXL.hpp"
+#include <iostream>
+#include <sstream>
+
+using namespace std;
 
 DXLPort::DXLPort(const string &iAddress, int iBaud)
+: lock(), syncWriteLock(), actuatorLock()
 {
-  portHandler = dxl::PortHandler::getPortHandler(iAddress.c_str());
+  portHandler = sdk::PortHandler::getPortHandler(iAddress.c_str());
 
   if(portHandler->openPort()) {
     if(portHandler->setBaudRate(iBaud)) {
-      packetHandler = dxl::PacketHandler::getPacketHandler(1.0);
+      packetHandler = sdk::PacketHandler::getPacketHandler(1.0);
       if(!packetHandler)
         throw invalid_argument("Failed to obtain packet handler for Dynamixel protocol 1.0");
     } else {
@@ -33,6 +38,11 @@ DXLPort::~DXLPort()
   }
 }
 
+bool DXLPort::isValidConnection()
+{
+  return portHandler != nullptr;
+}
+
 int DXLPort::getModel(uint8_t iId, uint16_t &oModel, uint8_t &oError)
 {
   return readUInt16(iId, 0, oModel, oError);
@@ -48,17 +58,20 @@ DXL &DXLPort::getDXL(uint8_t iId)
   return getDXL(iId, *this);
 }
 
-DXL &DXLPort::getDXL(uint8_t iId, DXLErrorHandler &iErrorHandler)
+DXL &DXLPort::getDXL(uint8_t iId, const DXLErrorHandler &iErrorHandler)
 {
+  actuatorLock.lock();
   auto i = actuators.find(iId);
+  actuatorLock.unlock();
   if(i != actuators.end())
     return *(i->second);
 
+  int result;
+  uint8_t error;
   DXL *newDXL = nullptr;
   if(portHandler) {
     uint16_t model;
-    uint8_t error;
-    int result = getModel(iId, model, error);
+    result = getModel(iId, model, error);
     if(result == COMM_SUCCESS) {
       switch(model) {
         case MODEL_NUMBER_AX12A:
@@ -87,34 +100,55 @@ DXL &DXLPort::getDXL(uint8_t iId, DXLErrorHandler &iErrorHandler)
   if(!newDXL) {
     newDXL = new DXL_DUMMY(*this, iId, MODEL_NUMBER_DUMMY, iErrorHandler);
   }
+
+  newDXL->setReturnDelayTime(0);
+
+  if(result != COMM_SUCCESS || error != 0)
+    iErrorHandler.handleError(*newDXL, result, error);
+  
+  actuatorLock.lock();
   actuators[iId] = newDXL;
+  actuatorLock.unlock();
   return *newDXL;
 }
 
 int DXLPort::readUInt8(uint8_t iId, uint16_t iRegister, uint8_t &oValue, uint8_t &oError)
 {
-  return packetHandler->read1ByteTxRx(portHandler, iId, iRegister, &oValue, &oError);
+  lock.lock();
+  int result = packetHandler->read1ByteTxRx(portHandler, iId, iRegister, &oValue, &oError);
+  lock.unlock();
+  return result;
 }
 
 int DXLPort::readUInt16(uint8_t iId, uint16_t iRegister, uint16_t &oValue, uint8_t &oError)
 {
-  return packetHandler->read2ByteTxRx(portHandler, iId, iRegister, &oValue, &oError);
+  lock.lock();
+  int result = packetHandler->read2ByteTxRx(portHandler, iId, iRegister, &oValue, &oError);
+  lock.unlock();
+  return result;
 }
 
 int DXLPort::writeUInt8(uint8_t iId, uint16_t iRegister, uint8_t iValue, uint8_t &oError)
 {
-  return packetHandler->write1ByteTxRx(portHandler, iId, iRegister, iValue, &oError);
+  lock.lock();
+  int result = packetHandler->write1ByteTxRx(portHandler, iId, iRegister, iValue, &oError);
+  lock.unlock();
+  return result;
 }
 
 int DXLPort::writeUInt16(uint8_t iId, uint16_t iRegister, uint16_t iValue, uint8_t &oError)
 {
-  return packetHandler->write2ByteTxRx(portHandler, iId, iRegister, iValue, &oError);
+  lock.lock();
+  int result = packetHandler->write2ByteTxRx(portHandler, iId, iRegister, iValue, &oError);
+  lock.unlock();
+  return result;
 }
 
 void DXLPort::syncWriteInit(uint16_t iRegister, uint16_t iDataLen)
 {
+  syncWriteLock.lock();
   syncWriteRegister = iRegister;
-  syncWriteHandler = new dxl::GroupSyncWrite(portHandler, packetHandler, iRegister, iDataLen);
+  syncWriteHandler = new sdk::GroupSyncWrite(portHandler, packetHandler, iRegister, iDataLen);
 }
 
 int DXLPort::syncWriteComplete()
@@ -122,15 +156,16 @@ int DXLPort::syncWriteComplete()
   int result = syncWriteHandler->txPacket();
   delete syncWriteHandler;
   syncWriteHandler = nullptr;
+  syncWriteLock.unlock();
   return result;
 }
 
-void DXLPort::handleError(DXL &iActuator, uint8_t iCommResult, uint8_t iErrorStatus)
+void DXLPort::handleError(DXL &iActuator, int iCommResult, uint8_t iErrorStatus) const
 {
 }
 
-DXL::DXL(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler)
-: port(iPort), id(iId), model(iModel), errorHandler(iErrorHandler)
+DXL::DXL(DXLPort &iPort, uint8_t iId, uint16_t iModel, const DXLErrorHandler &iErrorHandler)
+: port(iPort), id(iId), model(iModel), errorHandler(iErrorHandler), offset(0.0), polarity(1.0)
 { }
 
 DXL::~DXL()
@@ -445,7 +480,7 @@ float DXL::toAngle(uint16_t iSteps, float iUseOffset)
   return float(iSteps - getCenterOffset()) * getStepResolution() - offset * iUseOffset;
 }
 
-DXL_AX::DXL_AX(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler)
+DXL_AX::DXL_AX(DXLPort &iPort, uint8_t iId, uint16_t iModel, const DXLErrorHandler &iErrorHandler)
 : DXL(iPort, iId, iModel, iErrorHandler)
 { }
 
@@ -505,7 +540,7 @@ void DXL_AX::setCCWComplianceSlope(uint8_t iValue)
   errorHandler.handleError(*this, result, error);
 }
 
-DXL_EX::DXL_EX(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler)
+DXL_EX::DXL_EX(DXLPort &iPort, uint8_t iId, uint16_t iModel, const DXLErrorHandler &iErrorHandler)
 : DXL_AX(iPort, iId, iModel, iErrorHandler)
 { }
 
@@ -517,7 +552,7 @@ uint16_t DXL_EX::getSensedCurrent()
   return oValue;
 }
 
-DXL_MX::DXL_MX(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler)
+DXL_MX::DXL_MX(DXLPort &iPort, uint8_t iId, uint16_t iModel, const DXLErrorHandler &iErrorHandler)
 : DXL(iPort, iId, iModel, iErrorHandler)
 { }
 
@@ -613,7 +648,7 @@ void DXL_MX::setGoalAcceleration(uint16_t iValue)
   errorHandler.handleError(*this, result, error);
 }
 
-DXL_MX64::DXL_MX64(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler)
+DXL_MX64::DXL_MX64(DXLPort &iPort, uint8_t iId, uint16_t iModel, const DXLErrorHandler &iErrorHandler)
 : DXL_MX(iPort, iId, iModel, iErrorHandler)
 { }
 
@@ -661,3 +696,50 @@ void DXL_MX64::setTorque(uint16_t iValue)
 
 DXL_DUMMY::~DXL_DUMMY()
 { }
+
+DXLErrorHandler::~DXLErrorHandler()
+{ }
+
+void DXLErrorHandler::resultCodeToString(int iCode, string &oString)
+{
+  ostringstream ss;
+  switch(iCode) {
+    case COMM_SUCCESS: oString = "SUCCESS"; return;
+    case COMM_PORT_BUSY: oString = "PORT_BUSY"; return;
+    case COMM_TX_FAIL: oString = "TX_FAIL"; return;
+    case COMM_RX_FAIL: oString = "RX_FAIL"; return;
+    case COMM_TX_ERROR: oString = "TX_ERROR"; return;
+    case COMM_RX_WAITING: oString = "RX_WAITING"; return;
+    case COMM_RX_TIMEOUT: oString = "RX_TIMEOUT"; return;
+    case COMM_RX_CORRUPT: oString = "RX_CORRUPT"; return;
+    case COMM_NOT_AVAILABLE: oString = "NOT_AVAILABLE"; return;
+  }
+  oString = "UNKNOWN_CODE";
+}
+
+char *errorBitDescriptors[] = 
+{
+  "INSTRUCTION",
+  "OVERLOAD",
+  "CHECKSUM",
+  "RANGE",
+  "OVERHEAT",
+  "ANGLE",
+  "VOLTAGE"
+};
+
+void DXLErrorHandler::errorFlagsToString(uint8_t iFlags, string &oString)
+{
+  ostringstream ss;
+  bool space = false;
+  ss << "[";
+  for(int i = 0; i < 7; i++) {
+    if(iFlags & (1 << i)) {
+      if(space) ss << " ";
+      ss << errorBitDescriptors[i];
+      space = true;
+    }
+  }
+  ss << "]";
+  oString = ss.str();
+}

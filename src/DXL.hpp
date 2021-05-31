@@ -1,6 +1,10 @@
+#ifndef __DXL_HPP__
+#define __DXL_HPP__
+
 #include <dynamixel_sdk/dynamixel_sdk.h>
 #include <unordered_map>
 #include <stdexcept>
+#include <mutex>
 
 using namespace std;
 
@@ -84,14 +88,22 @@ enum {
   ERROR_BIT_INSTRUCTION = 64
 };
 
-#define dxl dynamixel
+#define TO_DEGREES(r) (r * 57.295779513)
+#define TO_RADIANS(r) (r * 0.017453293)
+
+#define sdk dynamixel
 
 class DXL;
 
 class DXLErrorHandler
 {
   public:
-    virtual void handleError(DXL &iDXL, uint8_t iComResult, uint8_t iErrorStatus) = 0;
+    static void resultCodeToString(int iCode, string &oString);
+    static void errorFlagsToString(uint8_t iFlags, string &oString);
+
+  public:
+    virtual ~DXLErrorHandler();
+    virtual void handleError(DXL &iDXL, int iComResult, uint8_t iErrorStatus) const = 0;
 };
 
 class DXLPort : public DXLErrorHandler
@@ -100,11 +112,13 @@ class DXLPort : public DXLErrorHandler
     DXLPort(const string &iAddress, int iBaud = 1000000);
     virtual ~DXLPort();
 
+    bool isValidConnection();
+
     int getModel(uint8_t iId, uint16_t &oModel, uint8_t &oError);
     int ping(uint8_t iId, uint8_t &oError);
 
     DXL &getDXL(uint8_t iId);
-    DXL &getDXL(uint8_t iId, DXLErrorHandler &iErrorHandler);
+    DXL &getDXL(uint8_t iId, const DXLErrorHandler &iErrorHandler);
 
     int readUInt8(uint8_t iId, uint16_t iRegister, uint8_t &oValue, uint8_t &oError);
     int readUInt16(uint8_t iId, uint16_t iRegister, uint16_t &oValue, uint8_t &oError);
@@ -114,7 +128,7 @@ class DXLPort : public DXLErrorHandler
     template <typename T>
     int syncWrite(uint16_t iRegister, uint16_t iDataLen, unordered_map<uint8_t, T> &iData);
 
-    virtual void handleError(DXL &iDXL, uint8_t iCommResult, uint8_t iErrorStatus);
+    virtual void handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus) const;
 
   protected:
     void syncWriteInit(uint16_t iRegister, uint16_t iDataLen);
@@ -123,9 +137,10 @@ class DXLPort : public DXLErrorHandler
     int syncWriteComplete();
 
   protected:
-    dxl::PortHandler *portHandler;
-    dxl::PacketHandler *packetHandler;
-    dxl::GroupSyncWrite *syncWriteHandler;
+    mutex lock, syncWriteLock, actuatorLock;
+    sdk::PortHandler *portHandler;
+    sdk::PacketHandler *packetHandler;
+    sdk::GroupSyncWrite *syncWriteHandler;
     uint16_t syncWriteRegister;
     unordered_map<uint8_t, DXL *> actuators;
 };
@@ -164,8 +179,17 @@ class DXL
   friend class DXLPort;
 
   public:
-    DXL(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler);
+    DXL(DXLPort &iPort, uint8_t iId, uint16_t iModel, const DXLErrorHandler &iErrorHandler);
     virtual ~DXL();
+
+    float getOffset() { return offset; }
+    void setOffset(float iOffset) { offset = iOffset; }
+
+    float getPolarity() { return polarity; }
+    void setPolarity(float iPolarity) { polarity = (iPolarity >= 0.0) ? 1.0: -1.0; }
+
+    uint8_t getId() { return id; }
+    uint8_t getModel() { return model; }
 
     virtual uint8_t getFirmwareVersion();
 
@@ -245,11 +269,11 @@ class DXL
     DXLPort &port;
     uint8_t id;
     uint16_t model;
-    uint8_t result;
+    int result;
     uint8_t error;
     float offset;
     float polarity;
-    DXLErrorHandler &errorHandler;
+    const DXLErrorHandler &errorHandler;
 };
 
 template <typename T>
@@ -283,7 +307,7 @@ T DXL::convertForRead(uint8_t iRegister, uint32_t iValue)
 class DXL_AX : public DXL
 {
   public:
-    DXL_AX(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler);
+    DXL_AX(DXLPort &iPort, uint8_t iId, uint16_t iModel, const DXLErrorHandler &iErrorHandler);
 
     uint8_t getCWComplianceMargin();
     void setCWComplianceMargin(uint8_t iMargin);
@@ -295,26 +319,26 @@ class DXL_AX : public DXL
     void setCCWComplianceSlope(uint8_t iMargin);
 
   protected:
-    virtual float getStepResolution() { return 0.29; }
+    virtual float getStepResolution() { return TO_RADIANS(0.29); }
     virtual uint16_t getCenterOffset() { return 512; }
 };
 
 class DXL_EX : public DXL_AX
 {
   public:
-    DXL_EX(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler);
+    DXL_EX(DXLPort &iPort, uint8_t iId, uint16_t iModel, const DXLErrorHandler &iErrorHandler);
 
     uint16_t getSensedCurrent();
 
   protected:
-    virtual float getStepResolution() { return 0.06127; }
+    virtual float getStepResolution() { return TO_RADIANS(0.06127); }
     virtual uint16_t getCenterOffset() { return 2048; }
 };
 
 class DXL_MX : public DXL
 {
   public:
-    DXL_MX(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler);
+    DXL_MX(DXLPort &iPort, uint8_t iId, uint16_t iModel, const DXLErrorHandler &iErrorHandler);
 
     uint16_t getMultiTurnOffset();
     void setMultiTurnOffset(uint16_t iOffset);
@@ -331,14 +355,14 @@ class DXL_MX : public DXL
     void setGoalAcceleration(uint16_t iAccel);
 
   protected:
-    virtual float getStepResolution() { return 0.088; }
+    virtual float getStepResolution() { return TO_RADIANS(0.088); }
     virtual uint16_t getCenterOffset() { return 2048; }
 };
 
 class DXL_MX64 : public DXL_MX
 {
   public:
-    DXL_MX64(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler);
+    DXL_MX64(DXLPort &iPort, uint8_t iId, uint16_t iModel, const DXLErrorHandler &iErrorHandler);
 
     uint16_t getCurrent();
     void setCurrent(uint16_t iCurrent);
@@ -351,7 +375,7 @@ class DXL_MX64 : public DXL_MX
 class DXL_DUMMY : public DXL
 {
   public:
-    DXL_DUMMY(DXLPort &iPort, uint8_t iId, uint16_t iModel, DXLErrorHandler &iErrorHandler)
+    DXL_DUMMY(DXLPort &iPort, uint8_t iId, uint16_t iModel, const DXLErrorHandler &iErrorHandler)
     : DXL(iPort, iId, iModel, iErrorHandler) { }
     virtual ~DXL_DUMMY();
 
@@ -422,3 +446,5 @@ class DXL_DUMMY : public DXL
   protected:
     float position;
 };
+
+#endif

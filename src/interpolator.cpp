@@ -25,12 +25,11 @@ using namespace sensor_msgs;
 #define CONTROL_HZ 30.0
 #define REPORT_HZ 30.0
 
-#define TO_DEGREES(r) (r * 57.295779513)
-
-class Interpolator
+class Interpolator : DXLErrorHandler
 {
   public:
     Interpolator(DXLPort &iDXL, ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTrajectoryTopic, vector<string> &iJointNames, uint32_t iQueueSize = 10);
+    virtual ~Interpolator();
 
     bool trajectoryService(colab_reachy_control::TrajectoryService::Request &iReq, colab_reachy_control::TrajectoryService::Response &iRes);
 
@@ -40,8 +39,11 @@ class Interpolator
 
     void timerTick(const ros::TimerEvent &iEvent) const;
 
+  protected:
+    virtual void handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus) const;
+
   public:
-    DXLPort &dxl;
+    DXLPort &u2d2;
     ros::NodeHandle &nh;
     ros::Publisher jointStatePub;
     ros::ServiceServer trajectorySrv;
@@ -55,7 +57,7 @@ class Interpolator
 unordered_map<string, int> kludgyDXLDict;
 
 Interpolator::Interpolator(DXLPort &iDXL, ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTrajectoryTopic, vector<string> &iJointNames, uint32_t iQueueSize)
-: dxl(iDXL), nh(iNH),
+: u2d2(iDXL), nh(iNH),
   jointStatePub(nh.advertise<JointState>(iJointStateTopic, iQueueSize)),
   trajectorySrv(nh.advertiseService<Interpolator, colab_reachy_control::TrajectoryService::Request, colab_reachy_control::TrajectoryService::Response>(iTrajectoryTopic, &Interpolator::trajectoryService, this)),
   jointNames(iJointNames)
@@ -63,7 +65,70 @@ Interpolator::Interpolator(DXLPort &iDXL, ros::NodeHandle &iNH, const string &iJ
   int i = 8;
   while(i--)
     passThroughJointState[i] = 0.0;
+
+  for(auto name : jointNames) {
+    int id = kludgyDXLDict[name];
+    DXL &actuator = u2d2.getDXL(id, *this);
+    if(id < 20) {
+      switch(id) {
+        case 10:
+          actuator.setOffset(TO_RADIANS(-90.0));
+          actuator.setPolarity(-1.0);
+          break;
+        case 11:
+          actuator.setOffset(TO_RADIANS(-90.0));
+          actuator.setPolarity(-1.0);
+          break;
+        case 12:
+          actuator.setPolarity(-1.0);
+          break;
+        case 13:
+          actuator.setPolarity(-1.0);
+          break;
+        case 14:
+          actuator.setPolarity(-1.0);
+          break;
+        case 15:
+          actuator.setPolarity(-1.0);
+          break;
+        case 16:
+        case 17:
+          break;
+      }
+    } else {
+      switch(id) {
+        case 20:
+          actuator.setOffset(TO_RADIANS(90.0));
+          break;
+        case 21:
+          actuator.setOffset(TO_RADIANS(90.0));
+          actuator.setPolarity(-1.0);
+          break;
+        case 22:
+          actuator.setPolarity(-1.0);
+          break;
+        case 23:
+          actuator.setPolarity(-1.0);
+          break;
+        case 24:
+          actuator.setOffset(TO_RADIANS(-15.0));
+          actuator.setPolarity(-1.0);
+          break;
+        case 25:
+          actuator.setPolarity(-1.0);
+          break;
+        case 26:
+          actuator.setPolarity(-1.0);
+          break;
+        case 27:
+          break;
+      }
+    }
+  }
 }
+
+Interpolator::~Interpolator()
+{ }
 
 bool Interpolator::trajectoryService(colab_reachy_control::TrajectoryService::Request &iReq, colab_reachy_control::TrajectoryService::Response &iRes)
 {
@@ -127,9 +192,11 @@ bool Interpolator::trajectoryService(colab_reachy_control::TrajectoryService::Re
   int paramIndex = 0;
   ros::Time startTime = ros::Time::now();
   bool interpolating = true;
-
+  vector<double> times;
   float jointState[8];
   ros::Rate spinRate(int(CONTROL_HZ));
+  //ros::Time driveStart;
+  //ros::Duration driveLatency;
   while(interpolating) {
     double elapsed = (ros::Time::now() - startTime).toSec();
     int newParamIndex = int(elapsed * CONTROL_HZ);
@@ -140,7 +207,10 @@ bool Interpolator::trajectoryService(colab_reachy_control::TrajectoryService::Re
         #if PASSTHROUGH
         remapJointState(iReq.dxl_ids, jointState);
         #else
+        //driveStart = ros.::Time::now();
         drive(iReq.dxl_ids, jointState);
+        //driveLatency = ros::Time::now() - driveStart;
+        //times.push_back(driveLatency.toSec());
         #endif
       }
     } else {
@@ -148,6 +218,16 @@ bool Interpolator::trajectoryService(colab_reachy_control::TrajectoryService::Re
     }
     spinRate.sleep();
   }
+  /*
+  ostringstream ss;
+  bool start = true;
+  for(auto time : times) {
+    if(!start) ss << " ";
+    ss << time;
+    start = false;
+  }
+  ROS_INFO("Drive timings: %s", ss.str().c_str());
+  */
 
   iRes.result = string("SUCCESS");
 
@@ -159,7 +239,14 @@ void Interpolator::drive(vector<int> &dxl_ids, float *iJointState)
   // TODO: Use sync write if actually connected to a real controller
   for(int i = 0; i < dxl_ids.size(); i++) {
     int id = dxl_ids[i];
-    DXL &actuator = dxl.getDXL(uint8_t(id));
+    DXL &actuator = u2d2.getDXL(uint8_t(id), *this);
+    /*
+    if(actuator.getModel() == MODEL_NUMBER_DUMMY) {
+      ROS_INFO("Using dummy actuator for id %d", id);
+    } else {
+      ROS_INFO("Attempting to set actuator %d goal position to %f", id, iJointState[i]);
+    }
+    */
     actuator.setGoalPosition(iJointState[i]);
   }
 }
@@ -169,7 +256,7 @@ vector<double> Interpolator::getJointState() const
   vector<double> jointState;
   for(auto name : jointNames) {
     int id = kludgyDXLDict[name];
-    DXL &actuator = dxl.getDXL(uint8_t(id));
+    DXL &actuator = u2d2.getDXL(uint8_t(id), *this);
     jointState.push_back(double(actuator.getPresentPosition()));
   }
   return jointState;
@@ -194,6 +281,19 @@ void Interpolator::timerTick(const ros::TimerEvent &iEvent) const
   jntState.position = getJointState();
   #endif
   jointStatePub.publish(jntState);
+}
+
+void Interpolator::handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus) const
+{
+  string resultString;
+  string errorString;
+  DXLErrorHandler::resultCodeToString(iCommResult, resultString);
+  DXLErrorHandler::errorFlagsToString(iErrorStatus, errorString);
+  if(iCommResult != COMM_SUCCESS || iErrorStatus != 0)
+    ROS_INFO("Actuator %d returned comm result: %s, error status: %s",
+      iDXL.getId(),
+      resultString.c_str(),
+      errorString.c_str());
 }
 
 int main(int argc, char **argv)
@@ -241,7 +341,13 @@ int main(int argc, char **argv)
   kludgyDXLDict["l_gripper"] = 27;
 
   try {
-    DXLPort dxl("/dev/ttyUSB2");
+    DXLPort dxl("/dev/ttyACM1");
+
+    if(!dxl.isValidConnection()) {
+      ROS_INFO("Could not connect to Dynamixel control hardware, using a dummy interface.");
+    } else {
+      ROS_INFO("Connected successfully to Dynamixel control hardware");
+    }
 
     Interpolator rai(dxl, n, string("right_arm_controller/joint_states"), string("action_server/right_arm_trajectory"), rightArmJointNames, 10);
     Interpolator lai(dxl, n, string("left_arm_controller/joint_states"), string("action_server/left_arm_trajectory"), leftArmJointNames, 10);
