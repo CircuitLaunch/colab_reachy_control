@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   sensor_msgs
   std_msgs
+  std_srvs
   genmsg
   message_generation
 )
@@ -61,11 +62,10 @@ add_message_files(
 )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+add_service_files(
+  FILES
+  TrajectoryService.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -84,6 +84,7 @@ generate_messages(
   nav_msgs
   sensor_msgs
   std_msgs
+  std_srvs
 )
 
 ################################################
@@ -118,7 +119,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES colab_reachy_control
-#  CATKIN_DEPENDS actionlib_msgs control_msgs diagnostic_msgs geometry_msgs nav_msgs roscpp rospy sensor_msgs std_msgs
+#  CATKIN_DEPENDS actionlib_msgs control_msgs diagnostic_msgs geometry_msgs nav_msgs roscpp rospy sensor_msgs std_msgs std_srvs
 #  DEPENDS system_lib
 )
 

@@ -1,0 +1,6 @@
+int32[] dxl_ids
+duration time_from_start
+duration goal_time_tolerance
+float32[] control_points
+---
+string result
