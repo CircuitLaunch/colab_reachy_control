@@ -13,6 +13,7 @@
 #include <colab_reachy_control/Trajectory.h>
 #include <colab_reachy_control/TrajectoryService.h>
 #include <sensor_msgs/JointState.h>
+#include <dynamixel_sdk/dynamixel_sdk.h>
 #include "BSpline/BSpline.hpp"
 #include "BSpline/Parametizer.hpp"
 
@@ -20,7 +21,7 @@ using namespace std;
 using namespace sensor_msgs;
 
 #define DEBUG 0
-
+#define PASSTHROUGH 1
 #define CONTROL_HZ 30.0
 #define REPORT_HZ 30.0
 
@@ -33,6 +34,8 @@ class Interpolator
 
     bool trajectoryService(colab_reachy_control::TrajectoryService::Request &iReq, colab_reachy_control::TrajectoryService::Response &iRes);
 
+    void drive(vector<int> &dxl_ids, float *ioJointState);
+    vector<float> getJointState();
     void remapJointState(vector<int> &dxl_ids, float *iJointState);
 
     void timerTick(const ros::TimerEvent &iEvent) const;
@@ -44,7 +47,7 @@ class Interpolator
 
     vector<string> jointNames;
 
-    float jointState[8];
+    float passThroughJointState[8];
 };
 
 Interpolator::Interpolator(ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTrajectoryTopic, vector<string> &iJointNames, uint32_t iQueueSize)
@@ -52,7 +55,11 @@ Interpolator::Interpolator(ros::NodeHandle &iNH, const string &iJointStateTopic,
   jointStatePub(nh.advertise<JointState>(iJointStateTopic, iQueueSize)),
   trajectorySrv(nh.advertiseService<Interpolator, colab_reachy_control::TrajectoryService::Request, colab_reachy_control::TrajectoryService::Response>(iTrajectoryTopic, &Interpolator::trajectoryService, this)),
   jointNames(iJointNames)
-{ }
+{
+  int i = 8;
+  while(i--)
+    passThroughJointState[i] = 0.0;
+}
 
 bool Interpolator::trajectoryService(colab_reachy_control::TrajectoryService::Request &iReq, colab_reachy_control::TrajectoryService::Response &iRes)
 {
@@ -115,7 +122,7 @@ bool Interpolator::trajectoryService(colab_reachy_control::TrajectoryService::Re
   ros::Time startTime = ros::Time::now();
   bool interpolating = true;
 
-  float tempJointState[8];
+  float jointState[8];
   ros::Rate spinRate(int(CONTROL_HZ));
   while(interpolating) {
     double elapsed = (ros::Time::now() - startTime).toSec();
@@ -123,8 +130,12 @@ bool Interpolator::trajectoryService(colab_reachy_control::TrajectoryService::Re
     if(newParamIndex < divisions) {
       if(newParamIndex > paramIndex) {
         float currentParam = parametization[newParamIndex];
-        spline.eval(currentParam, tempJointState);
-        remapJointState(iReq.dxl_ids, tempJointState);
+        spline.eval(currentParam, jointState);
+        #if PASSTHROUGH
+        remapJointState(iReq.dxl_ids, jointState);
+        #else
+        drive(iReq.dxl_ids, jointState);
+        #endif
       }
     } else {
       interpolating = false;
@@ -137,11 +148,21 @@ bool Interpolator::trajectoryService(colab_reachy_control::TrajectoryService::Re
   return true;
 }
 
+void Interpolator::drive(vector<int> &dxl_ids, float *iJointState)
+{
+}
+
+vector<float> Interpolator::getJointState()
+{
+  vector<float> jointState;
+  return jointState;
+}
+
 void Interpolator::remapJointState(vector<int> &dxl_ids, float *iJointState)
 {
   for(int src = 0; src < dxl_ids.size(); src++) {
     int dst = dxl_ids[src] - ((dxl_ids[src] < 20) ? 10 : 20);
-    jointState[dst] = iJointState[src];
+    passThroughJointState[dst] = iJointState[src];
   }
 }
 
@@ -150,7 +171,11 @@ void Interpolator::timerTick(const ros::TimerEvent &iEvent) const
   JointState jntState;
   jntState.header.stamp = ros::Time::now();
   jntState.name = jointNames;
-  jntState.position = vector<double>(jointState, jointState + 8);
+  #if PASSTHROUGH
+  jntState.position = vector<double>(passThroughJointState, passThroughJointState + 8);
+  #else
+  jntState.position = getJointState();
+  #endif
   jointStatePub.publish(jntState);
 }
 
