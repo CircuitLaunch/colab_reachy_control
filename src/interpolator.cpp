@@ -14,8 +14,8 @@
 #include <colab_reachy_control/TrajectoryService.h>
 #include <sensor_msgs/JointState.h>
 #include <dynamixel_sdk/dynamixel_sdk.h>
-#include "BSpline/BSpline.hpp"
-#include "BSpline/Parametizer.hpp"
+#include "BSpline/BSpline/BSpline.hpp"
+#include "BSpline/BSpline/Parametizer.hpp"
 
 using namespace std;
 using namespace sensor_msgs;
