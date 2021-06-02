@@ -26,7 +26,7 @@
   <arg name="use_rviz" default="true" />
 
   <node name="interpolator" pkg="colab_reachy_control" type="interpolator" respawn="true" output="screen">
-    <param name="device" value="/dev/ttyACM1" />s
+    <param name="device" value="/dev/ttyACM0" />s
   </node>
 
   <node name="action_server" pkg="colab_reachy_control" type="action_server.py" respawn="true" output="screen">

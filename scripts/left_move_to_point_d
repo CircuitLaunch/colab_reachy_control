@@ -1,0 +1,1 @@
+rostopic pub -1 /move_to_goal_topic/euler reachy_ros_moveit/move_to_goal_euler "{ side: 'left', pos_x: 0.3, pos_y: 0.0, pos_z: 0.9, euler_x: 180.0, euler_y: 0.0, euler_z: -45.0, order: 'zyx' }"

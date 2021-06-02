@@ -341,7 +341,7 @@ int main(int argc, char **argv)
   kludgyDXLDict["l_gripper"] = 27;
 
   string deviceName;
-  if(!n.getParam("device", deviceName)) deviceName = "/dev/ttyACM1";
+  if(!n.getParam("device", deviceName)) deviceName = "/dev/ttyACM0";
 
   try {
     DXLPort port(deviceName);

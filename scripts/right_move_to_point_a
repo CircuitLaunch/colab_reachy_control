@@ -1,0 +1,1 @@
+rostopic pub -1 /move_to_goal_topic/axis_angle reachy_ros_moveit/move_to_goal_axis_angle "{ side: 'right', pos_x: 0.0, pos_y: -0.2, pos_z: 0.354, axis_x: 0.0, axis_y: -1.0, axis_z: 0.0, angle: 0.0 }"

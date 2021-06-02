@@ -28,8 +28,8 @@ jointIdDict = {
 rightArmActionServer = None
 leftArmActionServer = None
 
-rPub = rospy.Publisher('action_server/right_arm_trajectory', Trajectory, queue_size = 5)
-lPub = rospy.Publisher('action_server/left_arm_trajectory', Trajectory, queue_size = 5)
+#rPub = rospy.Publisher('action_server/right_arm_trajectory', Trajectory, queue_size = 5)
+#lPub = rospy.Publisher('action_server/left_arm_trajectory', Trajectory, queue_size = 5)
 
 def rightArmActionServerCallback(goal: FollowJointTrajectoryGoal):
     actionServerCallback('right', rightArmActionServer, goal)
