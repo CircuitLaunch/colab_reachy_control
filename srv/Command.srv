@@ -1,0 +1,5 @@
+int32[] dxl_ids
+int32[] cmd
+int32[] values
+---
+string[] result

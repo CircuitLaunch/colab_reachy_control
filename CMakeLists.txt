@@ -152,11 +152,11 @@ add_executable(
   interpolator
 
   src/interpolator.cpp
-  src/BSpline/BSpline/BSpline.cpp
-  src/BSpline/BSpline/Functor.cpp
-  src/BSpline/BSpline/Legendre.cpp
-  src/BSpline/BSpline/Newton.cpp
-  src/BSpline/BSpline/Parametizer.cpp
+  src/BSpline/src/BSpline.cpp
+  src/BSpline/src/Functor.cpp
+  src/BSpline/src/Legendre.cpp
+  src/BSpline/src/Newton.cpp
+  src/BSpline/src/Parametizer.cpp
   src/DXL.cpp
 )
 
