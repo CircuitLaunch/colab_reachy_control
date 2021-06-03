@@ -4,7 +4,6 @@ import rospy
 import actionlib
 from trajectory_msgs.msg import JointTrajectoryPoint
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, FollowJointTrajectoryFeedback, FollowJointTrajectoryResult
-from colab_reachy_control.msg import Trajectory
 from colab_reachy_control.srv import *
 
 jointIdDict = {
@@ -29,8 +28,8 @@ jointIdDict = {
 rightArmActionServer = None
 leftArmActionServer = None
 
-rPub = rospy.Publisher('action_server/right_arm_trajectory', Trajectory, queue_size = 5)
-lPub = rospy.Publisher('action_server/left_arm_trajectory', Trajectory, queue_size = 5)
+#rPub = rospy.Publisher('action_server/right_arm_trajectory', Trajectory, queue_size = 5)
+#lPub = rospy.Publisher('action_server/left_arm_trajectory', Trajectory, queue_size = 5)
 
 def rightArmActionServerCallback(goal: FollowJointTrajectoryGoal):
     actionServerCallback('right', rightArmActionServer, goal)
@@ -60,13 +59,13 @@ def actionServerCallback(side, actionServer, goal: FollowJointTrajectoryGoal):
 
     flattenedWaypoints = [position for waypoint in waypoints for position in waypoint]
 
-    trajectoryRequest = TrajectoryServiceRequest()
+    trajectoryRequest = TrajectoryRequest()
     trajectoryRequest.dxl_ids = jointIds
     trajectoryRequest.time_from_start = goal.trajectory.points[-1].time_from_start
     trajectoryRequest.goal_time_tolerance = goalTimeTol
     trajectoryRequest.control_points = flattenedWaypoints
 
-    trajectoryService = rospy.ServiceProxy(f'action_server/{side}_arm_trajectory', TrajectoryService)
+    trajectoryService = rospy.ServiceProxy(f'action_server/{side}_arm_trajectory', Trajectory)
     trajectoryService(trajectoryRequest);
 
     actionServer.set_succeeded()
