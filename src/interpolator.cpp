@@ -341,13 +341,13 @@ int main(int argc, char **argv)
   kludgyDXLDict["l_gripper"] = 27;
 
   string deviceName;
-  if(!n.getParam("device", deviceName)) deviceName = "/dev/ttyACM0";
+  if(!n.getParam("/interpolator/device", deviceName)) deviceName = "/dev/serial/by-id/usb-Xevelabs_USB2AX_74031303437351011190-if00";
 
   try {
     DXLPort port(deviceName);
 
     if(!port.isValidConnection()) {
-      ROS_INFO("Could not connect to Dynamixel control hardware, using a dummy interface.");
+      ROS_INFO("Could not connect to Dynamixel control hardware at %s; using a dummy interface.", deviceName.c_str());
     } else {
       ROS_INFO("Connected successfully to Dynamixel control hardware at %s", deviceName.c_str());
     }

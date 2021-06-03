@@ -26,7 +26,7 @@
   <arg name="use_rviz" default="true" />
 
   <node name="interpolator" pkg="colab_reachy_control" type="interpolator" respawn="true" output="screen">
-    <param name="device" value="/dev/ttyACM0" />s
+    <param name="device" value="/dev/serial/by-id/usb-Xevelabs_USB2AX_74031303437351011190-if00" />
   </node>
 
   <node name="action_server" pkg="colab_reachy_control" type="action_server.py" respawn="true" output="screen">
@@ -36,7 +36,7 @@
     <param name="goal_time_tolerance" value="5.0" />
   </node>
 
-  <node name="move_to_goal" pkg="colab_reachy_control" type="move_to_goal" respawn="true" output="screen" />
+  <!-- <node name="move_to_goal" pkg="colab_reachy_control" type="move_to_goal" respawn="true" output="screen" /> -->
 
   <!-- Aggregate joint states from components -->
   <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
