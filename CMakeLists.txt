@@ -10,6 +10,7 @@ add_compile_options(-std=c++11)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
+  dynamixel_sdk
   actionlib_msgs
   control_msgs
   diagnostic_msgs
@@ -119,7 +120,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES colab_reachy_control
-#  CATKIN_DEPENDS actionlib_msgs control_msgs diagnostic_msgs geometry_msgs nav_msgs roscpp rospy sensor_msgs std_msgs std_srvs
+  CATKIN_DEPENDS actionlib_msgs control_msgs diagnostic_msgs geometry_msgs nav_msgs roscpp rospy sensor_msgs std_msgs std_srvs dynamixel_sdk
 #  DEPENDS system_lib
 )
 
@@ -151,11 +152,12 @@ add_executable(
   interpolator
 
   src/interpolator.cpp
-  src/BSpline/BSpline.cpp
-  src/BSpline/Functor.cpp
-  src/BSpline/Legendre.cpp
-  src/BSpline/Newton.cpp
-  src/BSpline/Parametizer.cpp
+  src/BSpline/src/BSpline.cpp
+  src/BSpline/src/Functor.cpp
+  src/BSpline/src/Legendre.cpp
+  src/BSpline/src/Newton.cpp
+  src/BSpline/src/Parametizer.cpp
+  src/DXL.cpp
 )
 
 ## Rename C++ executable without prefix

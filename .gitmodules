@@ -1,0 +1,3 @@
+[submodule "src/BSpline"]
+	path = src/BSpline
+	url = git@github.com:tigakub/BSplineCPP
