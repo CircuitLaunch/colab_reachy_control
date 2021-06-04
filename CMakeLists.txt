@@ -155,7 +155,6 @@ add_executable(
 
   src/interpolator.cpp
   src/BSpline/src/BSpline.cpp
-  src/BSpline/src/Functor.cpp
   src/BSpline/src/Legendre.cpp
   src/BSpline/src/Newton.cpp
   src/BSpline/src/Parametizer.cpp
