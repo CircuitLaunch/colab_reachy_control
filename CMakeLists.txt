@@ -153,13 +153,16 @@ include_directories(
 add_executable(
   interpolator
 
-  src/interpolator.cpp
+  src/main.cpp
+  src/Interpolator.cpp
   src/BSpline/src/BSpline.cpp
-  src/BSpline/src/Functor.cpp
   src/BSpline/src/Legendre.cpp
   src/BSpline/src/Newton.cpp
   src/BSpline/src/Parametizer.cpp
   src/DXL.cpp
+  src/DXLTelemetryPublisher.cpp
+  src/DXLCommandServer.cpp
+  src/Interpolator.cpp
 )
 
 ## Rename C++ executable without prefix

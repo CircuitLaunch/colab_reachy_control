@@ -109,6 +109,9 @@ class DXLErrorHandler
 class DXLPort : public DXLErrorHandler
 {
   public:
+    static uint8_t registerSize(uint8_t iRegister);
+
+  public:
     DXLPort(const string &iAddress, int iBaud = 1000000);
     virtual ~DXLPort();
 
@@ -145,35 +148,6 @@ class DXLPort : public DXLErrorHandler
     unordered_map<uint8_t, DXL *> actuators;
 };
 
-template <typename T>
-int DXLPort::syncWrite(uint16_t iRegister, uint16_t iDataLen, unordered_map<uint8_t, T> &iData)
-{
-  if(portHandler && packetHandler) {
-    syncWriteInit(iRegister, iDataLen);
-    typename unordered_map<uint8_t, T>::iterator i;
-    for(i = iData.begin(); i != iData.end(); i++) {
-      uint8_t id = i->first;
-      uint32_t value = i->second;
-      syncWritePush<T>(actuators[id], value);
-    }
-    return syncWriteComplete();
-  }
-  return COMM_SUCCESS;
-}
-
-template <typename T>
-void DXLPort::syncWritePush(DXL &iDXL, T iValue)
-{
-  uint8_t id = iDXL.id;
-  uint32_t value = iDXL.convertForWrite(syncWriteRegister, iValue);
-  uint8_t param[4];
-  param[0] = DXL_LOBYTE(DXL_LOWORD(value));
-  param[1] = DXL_HIBYTE(DXL_LOWORD(value));
-  param[2] = DXL_LOBYTE(DXL_HIWORD(value));
-  param[3] = DXL_HIBYTE(DXL_HIWORD(value));
-  syncWriteHandler->addParam(id, param);
-}
-
 class DXL
 {
   friend class DXLPort;
@@ -190,6 +164,8 @@ class DXL
 
     uint8_t getId() { return id; }
     uint8_t getModel() { return model; }
+    int getResult() { return result; }
+    uint8_t getError() { return error; }
 
     virtual uint8_t getFirmwareVersion();
 
@@ -276,34 +252,6 @@ class DXL
     const DXLErrorHandler &errorHandler;
 };
 
-template <typename T>
-uint32_t DXL::convertForWrite(uint8_t iRegister, T iValue)
-{
-  switch(iRegister) {
-    case RAM_GOAL_POSITION:
-    case RAM_PRESENT_POSITION:
-      return fromAngle(polarity * iValue);
-    case EEPROM_CW_ANGLE_LIMIT:
-    case EEPROM_CCW_ANGLE_LIMIT:
-      return fromAngle(polarity * iValue, 0.0);
-  }
-  return iValue;
-}
-
-template <typename T>
-T DXL::convertForRead(uint8_t iRegister, uint32_t iValue)
-{
-  switch(iRegister) {
-    case RAM_GOAL_POSITION:
-    case RAM_PRESENT_POSITION:
-      return polarity * toAngle(iValue);
-    case EEPROM_CW_ANGLE_LIMIT:
-    case EEPROM_CCW_ANGLE_LIMIT:
-      return polarity * toAngle(iValue, 0.0);
-  }
-  return iValue;
-}
-
 class DXL_AX : public DXL
 {
   public:
@@ -368,8 +316,8 @@ class DXL_MX64 : public DXL_MX
     void setCurrent(uint16_t iCurrent);
     uint8_t getTorqueCtlModeEnable();
     void setTorqueCtlModeEnable(uint8_t iEnable);
-    uint16_t getTorque();
-    void setTorque(uint16_t iTorque);
+    uint16_t getGoalTorque();
+    void setGoalTorque(uint16_t iTorque);
 };
 
 class DXL_DUMMY : public DXL
@@ -446,5 +394,62 @@ class DXL_DUMMY : public DXL
   protected:
     float position;
 };
+
+template <typename T>
+int DXLPort::syncWrite(uint16_t iRegister, uint16_t iDataLen, unordered_map<uint8_t, T> &iData)
+{
+  if(portHandler && packetHandler) {
+    syncWriteInit(iRegister, iDataLen);
+    typename unordered_map<uint8_t, T>::iterator i;
+    for(i = iData.begin(); i != iData.end(); i++) {
+      uint8_t id = i->first;
+      uint32_t value = i->second;
+      syncWritePush<T>(actuators[id], value);
+    }
+    return syncWriteComplete();
+  }
+  return COMM_SUCCESS;
+}
+
+template <typename T>
+void DXLPort::syncWritePush(DXL &iDXL, T iValue)
+{
+  uint8_t id = iDXL.id;
+  uint32_t value = iDXL.convertForWrite(syncWriteRegister, iValue);
+  uint8_t param[4];
+  param[0] = DXL_LOBYTE(DXL_LOWORD(value));
+  param[1] = DXL_HIBYTE(DXL_LOWORD(value));
+  param[2] = DXL_LOBYTE(DXL_HIWORD(value));
+  param[3] = DXL_HIBYTE(DXL_HIWORD(value));
+  syncWriteHandler->addParam(id, param);
+}
+
+template <typename T>
+uint32_t DXL::convertForWrite(uint8_t iRegister, T iValue)
+{
+  switch(iRegister) {
+    case RAM_GOAL_POSITION:
+    case RAM_PRESENT_POSITION:
+      return fromAngle(polarity * iValue);
+    case EEPROM_CW_ANGLE_LIMIT:
+    case EEPROM_CCW_ANGLE_LIMIT:
+      return fromAngle(polarity * iValue, 0.0);
+  }
+  return iValue;
+}
+
+template <typename T>
+T DXL::convertForRead(uint8_t iRegister, uint32_t iValue)
+{
+  switch(iRegister) {
+    case RAM_GOAL_POSITION:
+    case RAM_PRESENT_POSITION:
+      return polarity * toAngle(iValue);
+    case EEPROM_CW_ANGLE_LIMIT:
+    case EEPROM_CCW_ANGLE_LIMIT:
+      return polarity * toAngle(iValue, 0.0);
+  }
+  return iValue;
+}
 
 #endif
