@@ -1,0 +1,6 @@
+byte[] dxl_ids
+byte[] registers
+int32[] values
+---
+int32[] results
+byte[] error_bits

@@ -10,9 +10,11 @@
 #include <arpa/inet.h>
 #include <deque>
 #include <vector>
-#include <colab_reachy_control/Trajectory.h>
-#include <colab_reachy_control/Command.h>
 #include <sensor_msgs/JointState.h>
+#include <colab_reachy_control/Telemetry.h>
+#include <colab_reachy_control/Trajectory.h>
+#include <colab_reachy_control/WriteRegisters.h>
+#include <colab_reachy_control/ReadRegisters.h>
 #include "DXL.hpp"
 #include "BSpline/src/BSpline.hpp"
 #include "BSpline/src/Parametizer.hpp"
@@ -28,7 +30,7 @@ using namespace sensor_msgs;
 class Interpolator : DXLErrorHandler
 {
   public:
-    Interpolator(DXLPort &iPort, ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTrajectoryService, const string &iCommandService, vector<string> &iJointNames, uint32_t iQueueSize = 10);
+    Interpolator(DXLPort &iPort, ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTrajectoryService, vector<string> &iJointNames, uint32_t iQueueSize = 10);
     virtual ~Interpolator();
 
     bool trajectoryService(colab_reachy_control::Trajectory::Request &iReq, colab_reachy_control::Trajectory::Response &iRes);
@@ -39,13 +41,14 @@ class Interpolator : DXLErrorHandler
 
     void timerTick(const ros::TimerEvent &iEvent) const;
 
-  protected:
+  protected:iCommandService
     virtual void handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus) const;
 
   public:
     DXLPort &port;
     ros::NodeHandle &nh;
     ros::Publisher jointStatePub;
+    ros::Publisher telemetryPub;
     ros::ServiceServer trajectorySrv;
 
     vector<string> jointNames;
@@ -56,9 +59,10 @@ class Interpolator : DXLErrorHandler
 
 unordered_map<string, int> kludgyDXLDict;
 
-Interpolator::Interpolator(DXLPort &iPort, ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTrajectoryService, const string &iCommandService, vector<string> &iJointNames, uint32_t iQueueSize)
+Interpolator::Interpolator(DXLPort &iPort, ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTelemetryTopic, const string &iTrajectoryService, vector<string> &iJointNames, uint32_t iQueueSize)
 : port(iPort), nh(iNH),
   jointStatePub(nh.advertise<JointState>(iJointStateTopic, iQueueSize)),
+  telemetryPub(nh.advertise<Telemetry>(iTelemetryTopic, iQueueSize)),
   trajectorySrv(nh.advertiseService<Interpolator, colab_reachy_control::Trajectory::Request, colab_reachy_control::Trajectory::Response>(iTrajectoryService, &Interpolator::trajectoryService, this)),
   jointNames(iJointNames)
 {
@@ -281,6 +285,30 @@ void Interpolator::timerTick(const ros::TimerEvent &iEvent) const
   jntState.position = getJointState();
   #endif
   jointStatePub.publish(jntState);
+
+  Telemetry telemetry;
+  for(int i = 10; i < 18; i++) {
+    DXL &dxl = port.getDXL(i);
+    telemetry.dxl_ids.push_back(i);
+    telemetry.torque_limits.push_back(dxl.getTorqueLimit());
+    telemetry.present_speeds.push_back(dxl.getPresentSpeed());
+    telemetry.present_loads.push_back(dxl.getPresentLoad());
+    telemetry.present_voltages.push_back(dxl.getPresentVoltage());
+    telemetry.present_temperatures.push_back(dxl.getPresentTemperature());
+    telemetry.error_bits.push_back(dxl.error);
+  }
+
+  for(int i = 20; i < 20; i++) {
+    DXL &dxl = port.getDXL(i);
+    telemetry.dxl_ids.push_back(i);
+    telemetry.torque_limits.push_back(dxl.getTorqueLimit());
+    telemetry.present_speeds.push_back(dxl.getPresentSpeed());
+    telemetry.present_loads.push_back(dxl.getPresentLoad());
+    telemetry.present_voltages.push_back(dxl.getPresentVoltage());
+    telemetry.present_temperatures.push_back(dxl.getPresentTemperature());
+    telemetry.error_bits.push_back(dxl.error);
+  }
+  telemetryPub.publish(telemetry)
 }
 
 void Interpolator::handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus) const
@@ -294,6 +322,20 @@ void Interpolator::handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus)
       iDXL.getId(),
       resultString.c_str(),
       errorString.c_str());
+}
+
+class DXLCommandServer
+{
+  public:
+    DXLProxy(DXLPort &iPort);
+
+    bool writeCallback(colab_reachy_control::WriteRegisters::Request &iReq, colab_reachy_control::WriteRegisters::Response &iResp);
+    bool readCallback(colab_reachy_control::WriteRegisters::Request &iReq, colab_reachy_control::WriteRegisters::Response &iResp);
+
+  protected:
+    DXLPort &port;
+    ros::ServiceServer writeService;
+    ros::ServiceServer readService;
 }
 
 int main(int argc, char **argv)
@@ -352,8 +394,8 @@ int main(int argc, char **argv)
       ROS_INFO("Connected successfully to Dynamixel control hardware at %s", deviceName.c_str());
     }
 
-    Interpolator rai(port, n, string("right_arm_controller/joint_states"), string("action_server/right_arm_trajectory"), string("interpolator/left_arm_command"), rightArmJointNames, 10);
-    Interpolator lai(port, n, string("left_arm_controller/joint_states"), string("action_server/left_arm_trajectory"), string("interpolator/left_arm_command"), leftArmJointNames, 10);
+    Interpolator rai(port, n, string("right_arm_controller/joint_states"), string("right_arm_telemetry"), string("action_server/right_arm_trajectory"), string("rightt_arm_command"), rightArmJointNames, 10);
+    Interpolator lai(port, n, string("left_arm_controller/joint_states"), string("left_arm_telemetry"), string("action_server/left_arm_trajectory"), string("left_arm_command"), leftArmJointNames, 10);
 
     ros::Timer rightTimer = n.createTimer(ros::Duration(1.0 / REPORT_HZ), &Interpolator::timerTick, &rai);
     ros::Timer leftTimer = n.createTimer(ros::Duration(1.0 / REPORT_HZ), &Interpolator::timerTick, &lai);

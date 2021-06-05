@@ -35,9 +35,7 @@
     <!-- Amount of time (s) permitted to be late achieving goal -->
     <param name="goal_time_tolerance" value="5.0" />
   </node>
-
-  <!-- <node name="move_to_goal" pkg="colab_reachy_control" type="move_to_goal" respawn="true" output="screen" /> -->
-
+  
   <!-- Aggregate joint states from components -->
   <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
     <param name="use_gui" value="$(arg use_gui)"/>
