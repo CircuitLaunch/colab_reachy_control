@@ -20,7 +20,7 @@
 using namespace std;
 using namespace sensor_msgs;
 
-#define DEBUG 0
+#define DEBUG 1
 #define PASSTHROUGH 0
 #define CONTROL_HZ 30.0
 #define REPORT_HZ 30.0
@@ -28,7 +28,7 @@ using namespace sensor_msgs;
 class Interpolator : DXLErrorHandler
 {
   public:
-    Interpolator(DXLPort &iPort, ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTrajectoryService, const string &iCommandService, vector<string> &iJointNames, uint32_t iQueueSize = 10);
+    Interpolator(DXLPort &iPort, ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTrajectoryService,  vector<string> &iJointNames, uint32_t iQueueSize = 10);
     virtual ~Interpolator();
 
     bool trajectoryService(colab_reachy_control::Trajectory::Request &iReq, colab_reachy_control::Trajectory::Response &iRes);
@@ -56,7 +56,7 @@ class Interpolator : DXLErrorHandler
 
 unordered_map<string, int> kludgyDXLDict;
 
-Interpolator::Interpolator(DXLPort &iPort, ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTrajectoryService, const string &iCommandService, vector<string> &iJointNames, uint32_t iQueueSize)
+Interpolator::Interpolator(DXLPort &iPort, ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTrajectoryService, vector<string> &iJointNames, uint32_t iQueueSize)
 : port(iPort), nh(iNH),
   jointStatePub(nh.advertise<JointState>(iJointStateTopic, iQueueSize)),
   trajectorySrv(nh.advertiseService<Interpolator, colab_reachy_control::Trajectory::Request, colab_reachy_control::Trajectory::Response>(iTrajectoryService, &Interpolator::trajectoryService, this)),
@@ -166,9 +166,19 @@ bool Interpolator::trajectoryService(colab_reachy_control::Trajectory::Request &
       ROS_INFO(ss.str().c_str());
     }
   }
+
+  {
+    ROS_INFO("Instantiating spline with %d control points", controlPointCount);
+  }
   #endif
 
-  BSpline spline(&iReq.control_points[0], knots, controlPointCount);
+  BSpline spline(&iReq.control_points[0], knots);
+  #if DEBUG
+  {
+    ROS_INFO("Initializing spline knot vector for %d joints", jointCount);
+  }
+  #endif
+
   spline.init(jointCount, controlPointCount);
   Parametizer parametizer(spline);
   parametizer.init();
@@ -352,8 +362,8 @@ int main(int argc, char **argv)
       ROS_INFO("Connected successfully to Dynamixel control hardware at %s", deviceName.c_str());
     }
 
-    Interpolator rai(port, n, string("right_arm_controller/joint_states"), string("action_server/right_arm_trajectory"), string("interpolator/left_arm_command"), rightArmJointNames, 10);
-    Interpolator lai(port, n, string("left_arm_controller/joint_states"), string("action_server/left_arm_trajectory"), string("interpolator/left_arm_command"), leftArmJointNames, 10);
+    Interpolator rai(port, n, string("right_arm_controller/joint_states"), string("action_server/right_arm_trajectory"), rightArmJointNames, 10);
+    Interpolator lai(port, n, string("left_arm_controller/joint_states"), string("action_server/left_arm_trajectory"), leftArmJointNames, 10);
 
     ros::Timer rightTimer = n.createTimer(ros::Duration(1.0 / REPORT_HZ), &Interpolator::timerTick, &rai);
     ros::Timer leftTimer = n.createTimer(ros::Duration(1.0 / REPORT_HZ), &Interpolator::timerTick, &lai);
