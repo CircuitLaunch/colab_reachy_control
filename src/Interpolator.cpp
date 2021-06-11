@@ -156,7 +156,7 @@ bool Interpolator::trajectoryService(colab_reachy_control::Trajectory::Request &
   }
   #endif
 
-  BSpline spline(&iReq.control_points[0], knots, controlPointCount);
+  BSpline spline(&iReq.control_points[0], knots);
   spline.init(jointCount, controlPointCount);
   Parametizer parametizer(spline);
   parametizer.init();

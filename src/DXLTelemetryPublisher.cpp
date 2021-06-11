@@ -28,7 +28,7 @@ void DXLTelemetryPublisher::timerTick(const ros::TimerEvent &iEvent) const
     telemetry.error_bits.push_back(dxl.getError());
   }
 
-  for(int i = 20; i < 20; i++) {
+  for(int i = 20; i < 28; i++) {
     DXL &dxl = port.getDXL(i);
     telemetry.dxl_ids.push_back(i);
     telemetry.torque_limits.push_back(dxl.getTorqueLimit());
