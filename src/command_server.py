@@ -22,8 +22,12 @@ class CommandServer:
         self.dxlProxy = DXLProxy()
 
     def recoverCallback(self, recoverMsg):
-
-        pass
+        resp = RecoverResponse()
+        resp.result = 'failure'
+        for id in recoverMsg.dxl_ids:
+            self.dxlProxy.writeRegisters([id, id, id], [RAM_TORQUE_ENABLE, RAM_TORQUE_LIMIT, RAM_TORQUE_ENABLE], [0, 1023, 1])
+        resp.result = 'succes'
+        return resp
 
     def graspCallback(self, graspMsg):
         side = graspMsg.side
