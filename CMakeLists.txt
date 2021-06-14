@@ -66,6 +66,8 @@ add_message_files(
 add_service_files(
   FILES
   Grasp.srv
+  Recover.srv
+  Relax.srv
   WriteRegisters.srv
   ReadRegisters.srv
   Trajectory.srv
