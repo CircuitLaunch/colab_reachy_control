@@ -4,6 +4,58 @@
 
 using namespace std;
 
+uint8_t DXLPort::registerSize(uint8_t iRegister)
+{
+  switch(iRegister) {
+    case EEPROM_FIRMWARE_VERSION:
+    case EEPROM_RETURN_DELAY_TIME:
+    case EEPROM_TEMPERATURE_LIMIT:
+    case EEPROM_MIN_VOLTAGE_LIMIT:
+    case EEPROM_MAX_VOLTAGE_LIMIT:
+    case EEPROM_STATUS_RETURN_LEVEL:
+    case EEPROM_ALARM_LED:
+    case EEPROM_SHUTDOWN:
+    case RAM_TORQUE_ENABLE:
+    case RAM_LED:
+    case RAM_PRESENT_TEMPERATURE:
+    case RAM_PRESENT_VOLTAGE:
+    case RAM_REGISTERED:
+    case RAM_MOVING:
+    case RAM_LOCK:
+    case AX_RAM_CW_COMPLIANCE_MARGIN:
+    case AX_RAM_CCW_COMPLIANCE_MARGIN:
+    case AX_RAM_CW_COMPLIANCE_SLOPE:
+    case AX_RAM_CCW_COMPLIANCE_SLOPE:
+    case MX_EEPROM_RESOLUTION_DIVIDER:
+    /*
+    case MX_RAM_D_GAIN:
+    case MX_RAM_I_GAIN:
+    case MX_RAM_P_GAIN:
+    */
+    case MX64_RAM_TORQUE_CTRL_MODE_ENABLE:
+      return 1;
+    case EEPROM_CW_ANGLE_LIMIT:
+    case EEPROM_CCW_ANGLE_LIMIT:
+    case EEPROM_MAX_TORQUE:
+    case RAM_GOAL_POSITION:
+    case RAM_MOVING_SPEED:
+    case RAM_TORQUE_LIMIT:
+    case RAM_PRESENT_POSITION:
+    case RAM_PRESENT_SPEED:
+    case RAM_PRESENT_LOAD:
+    case RAM_PUNCH:
+    case EX_RAM_SENSED_CURRENT:
+    case MX_EEPROM_MULTI_TURN_OFFSET:
+    case MX_RAM_REALTIME_TICK:
+    case MX_RAM_GOAL_ACCELERATION:
+    case MX64_RAM_CURRENT:
+    case MX64_RAM_GOAL_TORQUE:
+      return 2;
+  }
+  return 0;
+}
+
+
 DXLPort::DXLPort(const string &iAddress, int iBaud)
 : lock(), syncWriteLock(), actuatorLock()
 {
@@ -105,7 +157,7 @@ DXL &DXLPort::getDXL(uint8_t iId, const DXLErrorHandler &iErrorHandler)
 
   if(result != COMM_SUCCESS || error != 0)
     iErrorHandler.handleError(*newDXL, result, error);
-  
+
   actuatorLock.lock();
   actuators[iId] = newDXL;
   actuatorLock.unlock();
@@ -680,7 +732,7 @@ void DXL_MX64::setTorqueCtlModeEnable(uint8_t iValue)
   errorHandler.handleError(*this, result, error);
 }
 
-uint16_t DXL_MX64::getTorque()
+uint16_t DXL_MX64::getGoalTorque()
 {
   uint16_t oValue = 0;
   result = port.readUInt16(id, MX64_RAM_GOAL_TORQUE, oValue, error);
@@ -688,7 +740,7 @@ uint16_t DXL_MX64::getTorque()
   return oValue;
 }
 
-void DXL_MX64::setTorque(uint16_t iValue)
+void DXL_MX64::setGoalTorque(uint16_t iValue)
 {
   result = port.writeUInt16(id, MX64_RAM_GOAL_TORQUE, iValue, error);
   errorHandler.handleError(*this, result, error);
@@ -717,7 +769,7 @@ void DXLErrorHandler::resultCodeToString(int iCode, string &oString)
   oString = "UNKNOWN_CODE";
 }
 
-char *errorBitDescriptors[] = 
+const char *errorBitDescriptors[] =
 {
   "INSTRUCTION",
   "OVERLOAD",

@@ -1,60 +1,48 @@
+#include "Interpolator.hpp"
 #include "ros/ros.h"
 #include <ros/console.h>
 #include <stdio.h>
 #include <string.h>
 #include <sstream>
+#include <unordered_map>
+/*
 #include <fcntl.h>
 #include <errno.h>
 #include <termio.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+*/
 #include <deque>
 #include <vector>
-#include <colab_reachy_control/Trajectory.h>
-#include <colab_reachy_control/Command.h>
-#include <sensor_msgs/JointState.h>
-#include "DXL.hpp"
+
 #include "BSpline/src/BSpline.hpp"
 #include "BSpline/src/Parametizer.hpp"
 
-using namespace std;
 using namespace sensor_msgs;
-
-#define DEBUG 1
-#define PASSTHROUGH 0
-#define CONTROL_HZ 30.0
-#define REPORT_HZ 30.0
-
-class Interpolator : DXLErrorHandler
-{
-  public:
-    Interpolator(DXLPort &iPort, ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTrajectoryService,  vector<string> &iJointNames, uint32_t iQueueSize = 10);
-    virtual ~Interpolator();
-
-    bool trajectoryService(colab_reachy_control::Trajectory::Request &iReq, colab_reachy_control::Trajectory::Response &iRes);
-
-    void drive(vector<int> &dxl_ids, float *ioJointState);
-    vector<double> getJointState() const;
-    void remapJointState(vector<int> &dxl_ids, float *iJointState);
-
-    void timerTick(const ros::TimerEvent &iEvent) const;
-
-  protected:
-    virtual void handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus) const;
-
-  public:
-    DXLPort &port;
-    ros::NodeHandle &nh;
-    ros::Publisher jointStatePub;
-    ros::ServiceServer trajectorySrv;
-
-    vector<string> jointNames;
-    unordered_map<string, int> jointDict;
-
-    float passThroughJointState[8];
-};
+using namespace std;
 
 unordered_map<string, int> kludgyDXLDict;
+
+void initKludgyDXLDict()
+{
+  kludgyDXLDict["r_shoulder_pitch"] = 10;
+  kludgyDXLDict["r_shoulder_roll"] = 11;
+  kludgyDXLDict["r_arm_yaw"] = 12;
+  kludgyDXLDict["r_elbow_pitch"] = 13;
+  kludgyDXLDict["r_forearm_yaw"] = 14;
+  kludgyDXLDict["r_wrist_pitch"] = 15;
+  kludgyDXLDict["r_wrist_roll"] = 16;
+  kludgyDXLDict["r_gripper"] = 17;
+
+  kludgyDXLDict["l_shoulder_pitch"] = 20;
+  kludgyDXLDict["l_shoulder_roll"] = 21;
+  kludgyDXLDict["l_arm_yaw"] = 22;
+  kludgyDXLDict["l_elbow_pitch"] = 23;
+  kludgyDXLDict["l_forearm_yaw"] = 24;
+  kludgyDXLDict["l_wrist_pitch"] = 25;
+  kludgyDXLDict["l_wrist_roll"] = 26;
+  kludgyDXLDict["l_gripper"] = 27;
+}
 
 Interpolator::Interpolator(DXLPort &iPort, ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTrajectoryService, vector<string> &iJointNames, uint32_t iQueueSize)
 : port(iPort), nh(iNH),
@@ -179,6 +167,7 @@ bool Interpolator::trajectoryService(colab_reachy_control::Trajectory::Request &
   }
   #endif
 
+  BSpline spline(&iReq.control_points[0], knots);
   spline.init(jointCount, controlPointCount);
   Parametizer parametizer(spline);
   parametizer.init();
@@ -304,76 +293,4 @@ void Interpolator::handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus)
       iDXL.getId(),
       resultString.c_str(),
       errorString.c_str());
-}
-
-int main(int argc, char **argv)
-{
-  ros::init(argc, argv, "interpolator");
-
-  ros::NodeHandle n;
-
-  vector<string> rightArmJointNames;
-  rightArmJointNames.push_back("r_shoulder_pitch");
-  rightArmJointNames.push_back("r_shoulder_roll");
-  rightArmJointNames.push_back("r_arm_yaw");
-  rightArmJointNames.push_back("r_elbow_pitch");
-  rightArmJointNames.push_back("r_forearm_yaw");
-  rightArmJointNames.push_back("r_wrist_pitch");
-  rightArmJointNames.push_back("r_wrist_roll");
-  rightArmJointNames.push_back("r_gripper");
-
-  vector<string> leftArmJointNames;
-  leftArmJointNames.push_back("l_shoulder_pitch");
-  leftArmJointNames.push_back("l_shoulder_roll");
-  leftArmJointNames.push_back("l_arm_yaw");
-  leftArmJointNames.push_back("l_elbow_pitch");
-  leftArmJointNames.push_back("l_forearm_yaw");
-  leftArmJointNames.push_back("l_wrist_pitch");
-  leftArmJointNames.push_back("l_wrist_roll");
-  leftArmJointNames.push_back("l_gripper");
-
-  kludgyDXLDict["r_shoulder_pitch"] = 10;
-  kludgyDXLDict["r_shoulder_roll"] = 11;
-  kludgyDXLDict["r_arm_yaw"] = 12;
-  kludgyDXLDict["r_elbow_pitch"] = 13;
-  kludgyDXLDict["r_forearm_yaw"] = 14;
-  kludgyDXLDict["r_wrist_pitch"] = 15;
-  kludgyDXLDict["r_wrist_roll"] = 16;
-  kludgyDXLDict["r_gripper"] = 17;
-
-  kludgyDXLDict["l_shoulder_pitch"] = 20;
-  kludgyDXLDict["l_shoulder_roll"] = 21;
-  kludgyDXLDict["l_arm_yaw"] = 22;
-  kludgyDXLDict["l_elbow_pitch"] = 23;
-  kludgyDXLDict["l_forearm_yaw"] = 24;
-  kludgyDXLDict["l_wrist_pitch"] = 25;
-  kludgyDXLDict["l_wrist_roll"] = 26;
-  kludgyDXLDict["l_gripper"] = 27;
-
-  string deviceName;
-  if(!n.getParam("/interpolator/device", deviceName)) deviceName = "/dev/serial/by-id/usb-Xevelabs_USB2AX_74031303437351011190-if00";
-
-  try {
-    DXLPort port(deviceName);
-
-    if(!port.isValidConnection()) {
-      ROS_INFO("Could not connect to Dynamixel control hardware at %s; using a dummy interface.", deviceName.c_str());
-    } else {
-      ROS_INFO("Connected successfully to Dynamixel control hardware at %s", deviceName.c_str());
-    }
-
-    Interpolator rai(port, n, string("right_arm_controller/joint_states"), string("action_server/right_arm_trajectory"), rightArmJointNames, 10);
-    Interpolator lai(port, n, string("left_arm_controller/joint_states"), string("action_server/left_arm_trajectory"), leftArmJointNames, 10);
-
-    ros::Timer rightTimer = n.createTimer(ros::Duration(1.0 / REPORT_HZ), &Interpolator::timerTick, &rai);
-    ros::Timer leftTimer = n.createTimer(ros::Duration(1.0 / REPORT_HZ), &Interpolator::timerTick, &lai);
-
-    ros::AsyncSpinner spinner(4);
-    spinner.start();
-    ros::waitForShutdown();
-
-  } catch (exception &e) {
-    ROS_FATAL("Failed to connect to reachy %s", e.what());
-    exit(-1);
-  }
 }
