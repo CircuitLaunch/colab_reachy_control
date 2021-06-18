@@ -6,7 +6,7 @@ from DXLProxy import *
 from colab_reachy_control.msg import Telemetry
 from threading import Lock
 
-from colab_reachy_control.srv import Telemetry, Grasp
+from colab_reachy_control.srv import Telemetry, Grasp, Rest, Relax, Grasp
 
 class CommandServer:
     def __init__(self):
@@ -14,10 +14,9 @@ class CommandServer:
         self.telemLock = Lock()
         self.telemSub = rospy.Subscriber('dxl_telemetry', Telemetry, self.telemetryCallback)
 
-        self.recoverServer = rospy.ServiceProxy('recover', Recover, self.recoverCallback)
-        self.graspServer = rospy.ServiceProxy('grasp', Grasp, self.graspCallback)
-        self.restServer = rospy.ServiceProxy('rest', String, self.restCallback)
-        self.relaxServer = rospy.ServiceProxy('relax', String, self.relaxCallback)
+        self.recoverServer = rospy.Service('recover', Recover, self.recoverCallback)
+        self.graspServer = rospy.Service('grasp', Grasp, self.graspCallback)
+        self.relaxServer = rospy.Service('relax', Relax, self.relaxCallback)
 
         self.dxlProxy = DXLProxy()
 
@@ -26,7 +25,7 @@ class CommandServer:
         resp.result = 'failure'
         for id in recoverMsg.dxl_ids:
             self.dxlProxy.writeRegisters([id, id, id], [RAM_TORQUE_ENABLE, RAM_TORQUE_LIMIT, RAM_TORQUE_ENABLE], [0, 1023, 1])
-        resp.result = 'succes'
+        resp.result = 'success'
         return resp
 
     def graspCallback(self, graspMsg):
@@ -40,7 +39,7 @@ class CommandServer:
         gripping = true
         resp = GraspResponse()
         startTime = rospy.Time.now()
-        while(gripping && (rospy.Time.now() - startTim)e < rospy.Duration(graspMsg.timeout)):
+        while(gripping && (rospy.Time.now() - startTime) < rospy.Duration(graspMsg.timeout)):
             with self.telemLock:
                 presentPosition = self.telemDict[gripperId]['present_position']
                 presentLoad = self.telemDict[gripperId]['present_load']
@@ -54,11 +53,15 @@ class CommandServer:
             rate.sleep()
         return resp
 
-    def restCallback(self, restMsg):
-        side = restMsg.data
-
     def relaxCallback(self, relaxMsg):
         side = relaxMsg.data
+        ids = [id + (20 if (side == "left") else 10) for id in range(0, 9)]
+        cmds = [RAM_TORQUE_ENABLE] * len(ids)
+        vals = [0] * len(ids)
+        self.dxlProxy.writeRegisters(ids, cmds, vals)
+        resp = RelaxResponse()
+        resp.result = "success"
+        return resp
 
     def telemetryCallback(self, telemetry):
         for i, id in enumerate(telemetry.dxl_ids):
