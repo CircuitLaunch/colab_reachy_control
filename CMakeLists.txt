@@ -59,14 +59,17 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  move_to_goal_axis_angle.msg
-  move_to_goal_euler.msg
+  Telemetry.msg
 )
 
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
-  Command.srv
+  Grasp.srv
+  Recover.srv
+  Relax.srv
+  WriteRegisters.srv
+  ReadRegisters.srv
   Trajectory.srv
 )
 
@@ -153,12 +156,16 @@ include_directories(
 add_executable(
   interpolator
 
-  src/interpolator.cpp
+  src/main.cpp
+  src/Interpolator.cpp
   src/BSpline/src/BSpline.cpp
   src/BSpline/src/Legendre.cpp
   src/BSpline/src/Newton.cpp
   src/BSpline/src/Parametizer.cpp
   src/DXL.cpp
+  src/DXLTelemetryPublisher.cpp
+  src/DXLCommandServer.cpp
+  src/Interpolator.cpp
 )
 
 ## Rename C++ executable without prefix

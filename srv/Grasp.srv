@@ -1,0 +1,7 @@
+string side
+float32 gripper_speed
+float32 target_load
+float32 timeout
+---
+string result
+float32 present_Load
