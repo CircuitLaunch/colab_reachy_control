@@ -1,4 +1,5 @@
 import rospy
+import math
 from colab_reachy_control.srv import ReadRegisters, ReadRegistersRequest, ReadRegistersResponse, WriteRegisters, WriteRegistersRequest, WriteRegistersResponse
 
 EEPROM_FIRMWARE_VERSION = 2
@@ -66,12 +67,64 @@ class DXLProxy:
         req.dxl_ids = ids
         req.registers = registers
         resp = self.readRegSrvProx(req)
+        convertedValues = [convertFromRead(id, register, value) for id, register, value in zip(ids, registers, resp.values)]
         return resp.values, resp.results, resp.error_bits
 
     def writeRegisters(self, ids, registers, values):
+        convertedValues = [convertForWrite(id, register, value) for id, register, value in zip(ids, registers, values)]
         req = WriteRegistersRequest()
         req.dxl_ids = ids
         req.registers = registers
-        req.values = values
+        req.values = convertedValues
         resp = self.writeRegSrvProx(req)
         return resp.results, resp.error_bits
+
+    def convertForWrite(self, id, register, value):
+        convertedValue = value
+        if register in [EEPROM_CW_ANGLE_LIMIT, EEPROM_CCW_ANGLE_LIMIT]:
+            convertedValue = fromAngle(id, value)
+        if register == GOAL_POSITION:
+            convertedValue = fromAngle(id, value * polarity(id))
+        return convertedValue
+
+    def convertFromRead(self, id, register, value):
+        convertedValue = value
+        if register in [EEPROM_CW_ANGLE_LIMIT, EEPROM_CCW_ANGLE_LIMIT]:
+            convertedValue = toAngle(id, value) * polarity(id)
+        if register in [GOAL_POSITION, PRESENT_POSITION]:
+            convertedValue = toAngle(id, value) * polarity(id)
+        return convertedValue
+
+    def fromAngle(self, id, value):
+        return centerOffset(id) + (value + offset(id)) / stepResolution(id)
+
+    def toAngle(self, id, value):
+        return (value - centerOffset(id)) * stepResolution(id) - offset(id)
+
+    def stepResolution(self, id):
+        if id in [10, 20, 11, 21, 13, 23, 15, 25, 16, 26]: # MX
+            return math.radians(0.088)
+        #if id in [12, 22, 14, 24, 17, 27]: # AX
+        #    pass
+        return math.radians(0.29)
+
+    def centerOffset(self, id):
+        if id in [10, 20, 11, 21, 13, 23, 15, 25, 16, 26]: # MX
+            return 2048
+        #if id in [12, 22, 14, 24, 17, 27]: # AX
+        #    pass
+        return 512
+
+    def offset(self, id):
+        if id in [10, 11]:
+            return math.radians(-90.0)
+        if id in [20, 21]:
+            return math.radians(90.0)
+        if id = 24:
+            return math.radians(-15.0)
+        return 0.0
+
+    def polarity(self, id):
+        if id in [16, 17, 20, 27]:
+            return 1.0
+        return -1.0
