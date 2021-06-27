@@ -71,6 +71,7 @@ add_service_files(
   WriteRegisters.srv
   ReadRegisters.srv
   Trajectory.srv
+  Zero.srv
 )
 
 ## Generate actions in the 'action' folder

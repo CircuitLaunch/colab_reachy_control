@@ -2,9 +2,11 @@
 
 import rospy
 import actionlib
+from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectoryPoint
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, FollowJointTrajectoryFeedback, FollowJointTrajectoryResult
 from colab_reachy_control.srv import *
+from threading import Lock
 
 jointIdDict = {
     'r_shoulder_pitch': 10,
@@ -37,6 +39,22 @@ def rightArmActionServerCallback(goal: FollowJointTrajectoryGoal):
 def leftArmActionServerCallback(goal: FollowJointTrajectoryGoal):
     actionServerCallback('left', leftArmActionServer, goal)
 
+currentPosLock = Lock()
+currentPos = {}
+
+def rightJointStateCallback(state: JointState):
+    with currentPosLock:
+        for i in range(0, len(state.name)):
+            currentPos[state.name[i]] = state.position[i]
+
+def leftJointStateCallback(state: JointState):
+    with currentPosLock:
+        for i in range(0, len(state.name)):
+            currentPos[state.name[i]] = state.position[i]
+
+rightJointStateSubscriber = rospy.Subscriber("right_arm_controller/joint_states", JointState, rightJointStateCallback)
+leftJointStateSubscriber = rospy.Subscriber("left_arm_controller/joint_states", JointState, leftJointStateCallback)
+
 rightArmActionServer = actionlib.SimpleActionServer("right_arm_controller/follow_joint_trajectory", FollowJointTrajectoryAction, execute_cb = rightArmActionServerCallback, auto_start = False)
 leftArmActionServer = actionlib.SimpleActionServer("left_arm_controller/follow_joint_trajectory", FollowJointTrajectoryAction, execute_cb = leftArmActionServerCallback, auto_start = False)
 
@@ -48,7 +66,7 @@ def actionServerCallback(side, actionServer, goal: FollowJointTrajectoryGoal):
         actionServer.set_aborted()
         return
 
-    jointIds = [jointIdDict[name] for name in jointNames];
+    jointIds = [jointIdDict[name] for name in jointNames]
     waypoints = [point.positions for point in goal.trajectory.points]
     goalTimeTol = goal.goal_time_tolerance if goal.goal_time_tolerance else rospy.Duration(rospy.get_param('~goal_time_tolerance'))
 
@@ -56,6 +74,15 @@ def actionServerCallback(side, actionServer, goal: FollowJointTrajectoryGoal):
         rospy.logerr(f'{side}_arm action_server received empty trajectory')
         actionServer.set_aborted()
         return
+
+    if len(waypoints) < 3:
+        if len(waypoints) == 1:
+            with currentPosLock:
+                currentPoints = [currentPos[name] for name in jointNames]
+            waypoints.insert(0, currentPoints)
+        if len(waypoints) == 2:
+            intermed = [(waypoints[0][i] + waypoints[1][i]) * 0.5 for i in range(0, len(waypoints[0]))]
+            waypoints.insert(1, intermed)
 
     flattenedWaypoints = [position for waypoint in waypoints for position in waypoint]
 

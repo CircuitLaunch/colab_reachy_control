@@ -67,11 +67,11 @@ class DXLProxy:
         req.dxl_ids = ids
         req.registers = registers
         resp = self.readRegSrvProx(req)
-        convertedValues = [convertFromRead(id, register, value) for id, register, value in zip(ids, registers, resp.values)]
+        convertedValues = [self.convertFromRead(id, register, value) for id, register, value in zip(ids, registers, resp.values)]
         return resp.values, resp.results, resp.error_bits
 
     def writeRegisters(self, ids, registers, values):
-        convertedValues = [convertForWrite(id, register, value) for id, register, value in zip(ids, registers, values)]
+        convertedValues = [self.convertForWrite(id, register, value) for id, register, value in zip(ids, registers, values)]
         req = WriteRegistersRequest()
         req.dxl_ids = ids
         req.registers = registers
@@ -82,24 +82,24 @@ class DXLProxy:
     def convertForWrite(self, id, register, value):
         convertedValue = value
         if register in [EEPROM_CW_ANGLE_LIMIT, EEPROM_CCW_ANGLE_LIMIT]:
-            convertedValue = fromAngle(id, value)
-        if register == GOAL_POSITION:
-            convertedValue = fromAngle(id, value * polarity(id))
+            convertedValue = self.fromAngle(id, value)
+        if register == RAM_GOAL_POSITION:
+            convertedValue = self.fromAngle(id, value * self.polarity(id))
         return convertedValue
 
     def convertFromRead(self, id, register, value):
         convertedValue = value
         if register in [EEPROM_CW_ANGLE_LIMIT, EEPROM_CCW_ANGLE_LIMIT]:
-            convertedValue = toAngle(id, value) * polarity(id)
-        if register in [GOAL_POSITION, PRESENT_POSITION]:
-            convertedValue = toAngle(id, value) * polarity(id)
+            convertedValue = self.toAngle(id, value) * self.polarity(id)
+        if register in [RAM_GOAL_POSITION, RAM_PRESENT_POSITION]:
+            convertedValue = self.toAngle(id, value) * self.polarity(id)
         return convertedValue
 
     def fromAngle(self, id, value):
-        return centerOffset(id) + (value + offset(id)) / stepResolution(id)
+        return self.centerOffset(id) + (value + self.offset(id)) / self.stepResolution(id)
 
     def toAngle(self, id, value):
-        return (value - centerOffset(id)) * stepResolution(id) - offset(id)
+        return (value - self.centerOffset(id)) * self.stepResolution(id) - self.offset(id)
 
     def stepResolution(self, id):
         if id in [10, 20, 11, 21, 13, 23, 15, 25, 16, 26]: # MX
@@ -120,7 +120,7 @@ class DXLProxy:
             return math.radians(-90.0)
         if id in [20, 21]:
             return math.radians(90.0)
-        if id = 24:
+        if id == 24:
             return math.radians(-15.0)
         return 0.0
 

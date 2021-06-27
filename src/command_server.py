@@ -6,7 +6,7 @@ from DXLProxy import *
 from colab_reachy_control.msg import Telemetry
 from threading import Lock
 
-from colab_reachy_control.srv import Telemetry, Grasp, Rest, Relax, Grasp
+from colab_reachy_control.srv import Grasp, GraspResponse, Recover, RecoverResponse, Relax, RelaxResponse, Zero, ZeroResponse
 
 class CommandServer:
     def __init__(self):
@@ -14,11 +14,23 @@ class CommandServer:
         self.telemLock = Lock()
         self.telemSub = rospy.Subscriber('dxl_telemetry', Telemetry, self.telemetryCallback)
 
+        self.zeroServer = rospy.Service('zero', Zero, self.zero)
         self.recoverServer = rospy.Service('recover', Recover, self.recoverCallback)
         self.graspServer = rospy.Service('grasp', Grasp, self.graspCallback)
         self.relaxServer = rospy.Service('relax', Relax, self.relaxCallback)
 
         self.dxlProxy = DXLProxy()
+    
+    def zero(self, zeroMsg):
+        resp = ZeroResponse()
+        side = zeroMsg.side
+        resp.result = 'failure'
+        ids = [10, 11, 12, 13, 14, 15, 16, 17]
+        if side == 'left':
+            ids = [20, 21, 22, 23, 24, 25, 26, 27]
+        self.dxlProxy.writeRegisters(ids, [RAM_GOAL_POSITION] * 8, [0] * 8)
+        resp.result = 'success'
+        return resp
 
     def recoverCallback(self, recoverMsg):
         resp = RecoverResponse()
@@ -39,7 +51,7 @@ class CommandServer:
         gripping = true
         resp = GraspResponse()
         startTime = rospy.Time.now()
-        while(gripping && (rospy.Time.now() - startTime) < rospy.Duration(graspMsg.timeout)):
+        while(gripping and (rospy.Time.now() - startTime) < rospy.Duration(graspMsg.timeout)):
             with self.telemLock:
                 presentPosition = self.telemDict[gripperId]['present_position']
                 presentLoad = self.telemDict[gripperId]['present_load']
@@ -54,7 +66,7 @@ class CommandServer:
         return resp
 
     def relaxCallback(self, relaxMsg):
-        side = relaxMsg.data
+        side = relaxMsg.side
         ids = [id + (20 if (side == "left") else 10) for id in range(0, 9)]
         cmds = [RAM_TORQUE_ENABLE] * len(ids)
         vals = [0] * len(ids)
@@ -66,13 +78,13 @@ class CommandServer:
     def telemetryCallback(self, telemetry):
         for i, id in enumerate(telemetry.dxl_ids):
             torqueLimit = telemetry.torque_limits[i]
-            presentSpeed = telemetry.present_speed[i]
-            presentLoad = telemetry.present_load[i]
-            presentVoltage = telemetry.present_voltage[i]
-            presentTemperature = telementry.present_temperature[i]
+            presentSpeed = telemetry.present_speeds[i]
+            presentLoad = telemetry.present_loads[i]
+            presentVoltage = telemetry.present_voltages[i]
+            presentTemperature = telemetry.present_temperatures[i]
             errorBits = telemetry.error_bits[i]
             with self.telemLock:
-                telemDict[id] = {
+                self.telemDict[id] = {
                     'torque_limit': torqueLimit,
                     'present_speed': presentSpeed,
                     'present_load': presentLoad,
@@ -85,7 +97,7 @@ class CommandServer:
                 self.dxlProxy.writeRegisters([id, id, id], [RAM_TORQUE_ENABLE, RAM_TORQUE_LIMIT, RAM_TORQUE_ENABLE], [0, 1023, 1])
             '''
 
-autoRecover = AutoRecover()
+commandServer = CommandServer()
 
 def main():
     rospy.init_node("reachy_action_server")

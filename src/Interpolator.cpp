@@ -154,13 +154,8 @@ bool Interpolator::trajectoryService(colab_reachy_control::Trajectory::Request &
       ROS_INFO(ss.str().c_str());
     }
   }
-
-  {
-    ROS_INFO("Instantiating spline with %d control points", controlPointCount);
-  }
   #endif
 
-  BSpline spline(&iReq.control_points[0], knots);
   #if DEBUG
   {
     ROS_INFO("Initializing spline knot vector for %d joints", jointCount);

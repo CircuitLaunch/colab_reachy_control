@@ -25,8 +25,10 @@
   <arg name="use_gui" default="false" />
   <arg name="use_rviz" default="true" />
 
+  <!--
   <node name="auto_recover" pkg="colab_reachy_control" type="auto_recover.py" respawn="true" output="screen" />
-
+  -->
+  
   <node name="interpolator" pkg="colab_reachy_control" type="interpolator" respawn="true" output="screen">
     <param name="device" value="/dev/serial/by-id/usb-Xevelabs_USB2AX_74031303437351011190-if00" />
   </node>
@@ -38,8 +40,8 @@
     <param name="goal_time_tolerance" value="5.0" />
   </node>
 
-  <node name="command_server" pkg="colab_reachy_control" type="command_server.py", respawn="true" output="screen" />
-  
+  <node name="command_server" pkg="colab_reachy_control" type="command_server.py" respawn="true" output="screen" />
+
   <!-- Aggregate joint states from components -->
   <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
     <param name="use_gui" value="$(arg use_gui)"/>

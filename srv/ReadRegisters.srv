@@ -2,5 +2,6 @@ byte[] dxl_ids
 byte[] registers
 ---
 int32[] values
+float32[] fvalues
 int32[] results
 byte[] error_bits
