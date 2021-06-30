@@ -153,7 +153,7 @@ DXL &DXLPort::getDXL(uint8_t iId, const DXLErrorHandler &iErrorHandler)
     newDXL = new DXL_DUMMY(*this, iId, MODEL_NUMBER_DUMMY, iErrorHandler);
   }
 
-  newDXL->setReturnDelayTime(0);
+  newDXL->setReturnDelayTime(250);
 
   if(result != COMM_SUCCESS || error != 0)
     iErrorHandler.handleError(*newDXL, result, error);
