@@ -11,7 +11,7 @@
 DXLTelemetryPublisher::DXLTelemetryPublisher(DXLPort &iPort, NodeHandle &iNH, int iQueueSize)
 : port(iPort), nh(iNH), enableTelem(true), enableTelemMutex(),
   telemetryPub(nh.advertise<colab_reachy_control::Telemetry>("dxl_telemetry", iQueueSize)),
-  enableTelemetrySrv(nh.advertiseService<DXLTelemetryPublisher, SetBool::Request, SetBool::Response>(string("/colab_reachy_control/enableExtraTelemetry"), &DXLTelemetryPublisher::enableTelemetrySrvCB, this))
+  enableTelemetrySrv(nh.advertiseService<DXLTelemetryPublisher, SetBool::Request, SetBool::Response>(string("colab_reachy_control/enable_extra_telem"), &DXLTelemetryPublisher::enableTelemetrySrvCB, this))
 { }
 
 void DXLTelemetryPublisher::enableTelemetry(bool iEnable)

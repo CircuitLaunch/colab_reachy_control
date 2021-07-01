@@ -2,6 +2,7 @@
 
 import rospy
 from std_msgs.msg import String
+from std_srvs.srv import SetBool, SetBoolResponse
 from DXLProxy import *
 from colab_reachy_control.msg import Telemetry
 from threading import Lock
@@ -19,6 +20,9 @@ class CommandServer:
         self.graspServer = rospy.Service('grasp', Grasp, self.graspCallback)
         self.relaxServer = rospy.Service('relax', Relax, self.relaxCallback)
 
+        self.enableRightArmJointStateTelem = rospy.ServiceProxy('right_arm_controller/enable_joint_state_telem'. SetBool)
+        self.enableExtraTelem = rospy.ServiceProxy('colab_reachy_control/enable_extra_telem', SetBool)
+
         self.dxlProxy = DXLProxy()
 
     def zero(self, zeroMsg):
@@ -33,6 +37,8 @@ class CommandServer:
         return resp
 
     def recoverCallback(self, recoverMsg):
+        self.enableRightArmJointStateTelem(False);
+        self.enableExtraTelem(False)
         resp = RecoverResponse()
         resp.result = 'failure'
         idCount = len(recoverMsg.dxl_ids)
@@ -48,6 +54,8 @@ class CommandServer:
             if self.telemDict[id]['error_bits'] != 0:
                 resp.result = 'failure'
                 return resp
+        self.enableExtraTelem(True)
+        self.enableRightArmJointStateTelem(True);
         return resp
 
     def graspCallback(self, graspMsg):
