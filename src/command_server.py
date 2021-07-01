@@ -43,8 +43,11 @@ class CommandServer:
         rospy.sleep()
         self.writeRegisters([recoverMsg.dxl_ids], [RAM_TORQUE_ENABLE] * idCount, [1] * idCount)
         rospy.sleep()
-        if self.telemDict['error_bits'] == 0:
-            resp.result = 'success'
+        resp.result = 'success'
+        for id in recoverMsg.dxl_ids:
+            if self.telemDict[id]['error_bits'] != 0:
+                resp.result = 'failure'
+                return resp
         return resp
 
     def graspCallback(self, graspMsg):
