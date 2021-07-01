@@ -35,7 +35,6 @@ bool DXLCommandServer::writeService(colab_reachy_control::WriteRegisters::Reques
       result = port.writeUInt8(id, reg, uint8_t(val), error);
     else
       result = port.writeUInt16(id, reg, uint16_t(val), error);
-    sleep_for(microseconds(500));
     iResp.results.push_back(result);
     iResp.error_bits.push_back(error);
   }

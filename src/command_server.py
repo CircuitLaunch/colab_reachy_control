@@ -20,7 +20,7 @@ class CommandServer:
         self.relaxServer = rospy.Service('relax', Relax, self.relaxCallback)
 
         self.dxlProxy = DXLProxy()
-    
+
     def zero(self, zeroMsg):
         resp = ZeroResponse()
         side = zeroMsg.side
@@ -35,9 +35,16 @@ class CommandServer:
     def recoverCallback(self, recoverMsg):
         resp = RecoverResponse()
         resp.result = 'failure'
-        for id in recoverMsg.dxl_ids:
-            self.dxlProxy.writeRegisters([id, id, id], [RAM_TORQUE_ENABLE, RAM_TORQUE_LIMIT, RAM_TORQUE_ENABLE], [0, 1023, 1])
-        resp.result = 'success'
+        idCount = len(recoverMsg.dxl_ids)
+        rospy.Rate(1)
+        self.writeRegisters([recoverMsg.dxl_ids], [RAM_TORQUE_ENABLE] * idCount, [0] * idCount)
+        rospy.sleep()
+        self.writeRegisters([recoverMsg.dxl_ids], [RAM_TORQUE_LIMIT] * idCount, [1023] * idCount)
+        rospy.sleep()
+        self.writeRegisters([recoverMsg.dxl_ids], [RAM_TORQUE_ENABLE] * idCount, [1] * idCount)
+        rospy.sleep()
+        if self.telemDict['error_bits'] == 0:
+            resp.result = 'success'
         return resp
 
     def graspCallback(self, graspMsg):

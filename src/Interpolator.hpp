@@ -30,7 +30,7 @@ class Interpolator : DXLErrorHandler
     void timerTick(const ros::TimerEvent &iEvent) const;
 
   protected:
-    virtual void handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus) const;
+    virtual void handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus, const string &iErrorMsg) const;
 
   public:
     DXLPort &port;

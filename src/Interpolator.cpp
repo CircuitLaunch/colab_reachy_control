@@ -277,15 +277,16 @@ void Interpolator::timerTick(const ros::TimerEvent &iEvent) const
   jointStatePub.publish(jntState);
 }
 
-void Interpolator::handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus) const
+void Interpolator::handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus, const string &iErrorMsg) const
 {
   string resultString;
   string errorString;
   DXLErrorHandler::resultCodeToString(iCommResult, resultString);
   DXLErrorHandler::errorFlagsToString(iErrorStatus, errorString);
   if(iCommResult != COMM_SUCCESS || iErrorStatus != 0)
-    ROS_INFO("Actuator %d returned comm result: %s, error status: %s",
+    ROS_INFO("Actuator %d returned comm result: %s, error status: %s, error message: %s",
       iDXL.getId(),
       resultString.c_str(),
-      errorString.c_str());
+      errorString.c_str(),
+      iErrorMsg.c_str());
 }
