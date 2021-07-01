@@ -3,6 +3,11 @@
 
 #include "DXL.hpp"
 #include "ros/ros.h"
+#include <std_srvs/SetBool.h>
+
+using namespace ros;
+using namespace std;
+using namespace std_srvs;
 
 class DXLTelemetryPublisher
 {
@@ -10,12 +15,20 @@ class DXLTelemetryPublisher
     DXLTelemetryPublisher(DXLPort &iPort, ros::NodeHandle &iNH, int iQueueSize = 10);
     virtual ~DXLTelemetryPublisher() { }
 
-    void timerTick(const ros::TimerEvent &iEvent) const;
+    void enableTelemetry(bool iEnable);
+    bool isTelemetryEnabled();
+    bool enableTelemetrySrvCB(SetBool::Request &iReq, SetBool::Response &oResp);
+
+    void timerTick(const TimerEvent &iEvent);
 
   protected:
     DXLPort &port;
-    ros::NodeHandle &nh;
-    ros::Publisher telemetryPub;
+    NodeHandle &nh;
+    Publisher telemetryPub;
+
+    mutex enableTelemMutex;
+    bool enableTelem;
+    ServiceServer enableTelemetrySrv;
 };
 
 #endif
