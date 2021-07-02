@@ -20,7 +20,7 @@ class CommandServer:
         self.graspServer = rospy.Service('grasp', Grasp, self.graspCallback)
         self.relaxServer = rospy.Service('relax', Relax, self.relaxCallback)
 
-        self.enableRightArmJointStateTelem = rospy.ServiceProxy('right_arm_controller/enable_joint_state_telem'. SetBool)
+        self.enableRightArmJointStateTelem = rospy.ServiceProxy('right_arm_controller/enable_joint_state_telem', SetBool)
         self.enableExtraTelem = rospy.ServiceProxy('colab_reachy_control/enable_extra_telem', SetBool)
 
         self.dxlProxy = DXLProxy()
