@@ -41,7 +41,7 @@ class CommandServer:
         if recoverMsg.dxl_ids[0] < 20:
             self.enableRightArmJointStateTelem(False)
         else:
-            self.enableLeftArmJointStateTeleme(False)
+            self.enableLeftArmJointStateTelem(False)
         self.enableExtraTelem(False)
         resp = RecoverResponse()
         resp.result = 'failure'
