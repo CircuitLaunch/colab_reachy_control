@@ -6,8 +6,9 @@ from std_srvs.srv import SetBool, SetBoolResponse
 from DXLProxy import *
 from colab_reachy_control.msg import Telemetry
 from threading import Lock
+import time
 
-from colab_reachy_control.srv import Grasp, GraspResponse, Recover, RecoverResponse, Relax, RelaxResponse, Zero, ZeroResponse
+from colab_reachy_control.srv import Grasp, GraspResponse, SetGripperPos, SetGripperPosResponse, Recover, RecoverResponse, Relax, RelaxResponse, RestPose, RestPoseResponse, Zero, ZeroResponse
 
 class CommandServer:
     def __init__(self):
@@ -17,8 +18,10 @@ class CommandServer:
 
         self.zeroServer = rospy.Service('zero', Zero, self.zero)
         self.recoverServer = rospy.Service('recover', Recover, self.recoverCallback)
+        self.gripperServer = rospy.Service('set_gripper_ppse', SetGripperPos, self.setGripperPosCallback)
         self.graspServer = rospy.Service('grasp', Grasp, self.graspCallback)
         self.relaxServer = rospy.Service('relax', Relax, self.relaxCallback)
+        self.restPoseServer = rospy.Service('rest_pose', RestPose, self.restPoseCallback)
 
         self.enableRighArmJointStateTelem = rospy.ServiceProxy('right_arm_controller/enable_joint_state_telem', SetBool)
         self.enableLeftArmJointStateTelem = rospy.ServiceProxy('left_arm_controller/enable_joint_state_telem', SetBool)
@@ -65,6 +68,15 @@ class CommandServer:
             self.enableLeftArmJointStateTelem(True)
         return resp
 
+    def setGripperPosCallback(self, gripperPosMsg):
+        side = gripperPosMsg.side
+        angle = gripperPosMsg.angle
+        id = 17 if side == 'right' else 27
+        self.dxlProxy.writeRegistgers([id], [RAM_GOAL_POSITION], [angle])
+        resp = SetGripperPosResponse()
+        resp.result = 'success'
+        return resp
+
     def graspCallback(self, graspMsg):
         side = graspMsg.side
         gripperId = 18
@@ -88,6 +100,42 @@ class CommandServer:
             else:
                 self.dxlProxy.writeRegisters([gripperId], [RAM_GOAL_POSITION], [presentPosition + gripperSpeed])
             rate.sleep()
+        return resp
+
+    def restPoseCallback(self, restPoseMsg):
+        side = restPoseMsg.side
+        speed = restPoseMsg.speed
+        ids = [id + (20 if (side == 'left') else 10) for id in range(0, 8)]
+        # set speed to 0.2 revolutions per second
+        cmds = [RAM_MOVING_SPEED] * len(ids)
+        vals = [speed] * 8
+        self.dxlProxy.writeRegisters(ids, cmds, vals)
+
+        cmds = [RAM_GOAL_POSITION] * len(ids)
+        vals = [0.0] * 8
+        self.dxlProxy.writeRegisters(ids, cmds, vals)
+
+        startTime = rospy.get_time()
+        cmds = [RAM_PRESENT_POSITION] * len(ids)
+        atRest = False
+        rate = rospy.Rate(1)
+        while(not atRest):
+            atRest = True
+            vals, results, errors = self.dxlProxy.readRegisters(ids, cmds)
+            for val in vals:
+                if abs(val) > 0.004363323129986:
+                    atRest = False
+            rate.sleep()
+            if rospy.get_time() - startTime > 60.0:
+                atRest = True
+
+        time.sleep(5.0)
+
+        cmds = [RAM_MOVING_SPEED] * len(ids)
+        self.dxlProxy.writeRegisters(ids, cmds, vals)
+
+        resp = RestPoseResponse()
+        resp.result = "success"
         return resp
 
     def relaxCallback(self, relaxMsg):
