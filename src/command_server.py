@@ -18,7 +18,7 @@ class CommandServer:
 
         self.zeroServer = rospy.Service('zero', Zero, self.zero)
         self.recoverServer = rospy.Service('recover', Recover, self.recoverCallback)
-        self.gripperServer = rospy.Service('set_gripper_pose', SetGripperPos, self.setGripperPosCallback)
+        self.gripperServer = rospy.Service('set_gripper_pos', SetGripperPos, self.setGripperPosCallback)
         self.graspServer = rospy.Service('grasp', Grasp, self.graspCallback)
         self.relaxServer = rospy.Service('relax', Relax, self.relaxCallback)
         self.restPoseServer = rospy.Service('rest_pose', RestPose, self.restPoseCallback)
