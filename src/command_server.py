@@ -72,7 +72,7 @@ class CommandServer:
         side = gripperPosMsg.side
         angle = gripperPosMsg.angle
         id = 17 if side == 'right' else 27
-        self.dxlProxy.writeRegistgers([id], [RAM_GOAL_POSITION], [angle])
+        self.dxlProxy.writeRegisters([id], [RAM_GOAL_POSITION], [angle])
         resp = SetGripperPosResponse()
         resp.result = 'success'
         return resp
