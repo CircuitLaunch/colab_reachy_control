@@ -52,8 +52,8 @@ int main(int argc, char **argv)
       ROS_INFO("Connected successfully to Dynamixel control hardware at %s", deviceName.c_str());
     }
 
-    Interpolator rai(port, n, string("right_arm_controller/joint_states"), string("action_server/right_arm_trajectory"), rightArmJointNames, 10);
-    Interpolator lai(port, n, string("left_arm_controller/joint_states"), string("action_server/left_arm_trajectory"), leftArmJointNames, 10);
+    Interpolator rai(port, n, string("right"), rightArmJointNames, 10);
+    Interpolator lai(port, n, string("left"), leftArmJointNames, 10);
 
     DXLCommandServer cmdSrv(port, n);
     DXLTelemetryPublisher telPub(port, n);

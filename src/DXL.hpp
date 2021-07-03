@@ -103,7 +103,7 @@ class DXLErrorHandler
 
   public:
     virtual ~DXLErrorHandler();
-    virtual void handleError(DXL &iDXL, int iComResult, uint8_t iErrorStatus) const = 0;
+    virtual void handleError(DXL &iDXL, int iComResult, uint8_t iErrorStatus, const string &iErrorMsg) const = 0;
 };
 
 class DXLPort : public DXLErrorHandler
@@ -131,7 +131,7 @@ class DXLPort : public DXLErrorHandler
     template <typename T>
     int syncWrite(uint16_t iRegister, uint16_t iDataLen, unordered_map<uint8_t, T> &iData);
 
-    virtual void handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus) const;
+    virtual void handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus, const string &iErrorMsg) const;
 
   protected:
     void syncWriteInit(uint16_t iRegister, uint16_t iDataLen);

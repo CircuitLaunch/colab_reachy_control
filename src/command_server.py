@@ -2,6 +2,7 @@
 
 import rospy
 from std_msgs.msg import String
+from std_srvs.srv import SetBool, SetBoolResponse
 from DXLProxy import *
 from colab_reachy_control.msg import Telemetry
 from threading import Lock
@@ -19,8 +20,12 @@ class CommandServer:
         self.graspServer = rospy.Service('grasp', Grasp, self.graspCallback)
         self.relaxServer = rospy.Service('relax', Relax, self.relaxCallback)
 
+        self.enableRighArmJointStateTelem = rospy.ServiceProxy('right_arm_controller/enable_joint_state_telem', SetBool)
+        self.enableLeftArmJointStateTelem = rospy.ServiceProxy('left_arm_controller/enable_joint_state_telem', SetBool)
+        self.enableExtraTelem = rospy.ServiceProxy('colab_reachy_control/enable_extra_telem', SetBool)
+
         self.dxlProxy = DXLProxy()
-    
+
     def zero(self, zeroMsg):
         resp = ZeroResponse()
         side = zeroMsg.side
@@ -33,11 +38,31 @@ class CommandServer:
         return resp
 
     def recoverCallback(self, recoverMsg):
+        if recoverMsg.dxl_ids[0] < 20:
+            self.enableRightArmJointStateTelem(False)
+        else:
+            self.enableLeftArmJointStateTelem(False)
+        self.enableExtraTelem(False)
         resp = RecoverResponse()
         resp.result = 'failure'
-        for id in recoverMsg.dxl_ids:
-            self.dxlProxy.writeRegisters([id, id, id], [RAM_TORQUE_ENABLE, RAM_TORQUE_LIMIT, RAM_TORQUE_ENABLE], [0, 1023, 1])
+        idCount = len(recoverMsg.dxl_ids)
+        rospy.Rate(1)
+        self.dxlProxy.writeRegisters([recoverMsg.dxl_ids], [RAM_TORQUE_ENABLE] * idCount, [0] * idCount)
+        rospy.sleep()
+        self.dxlProxy.writeRegisters([recoverMsg.dxl_ids], [RAM_TORQUE_LIMIT] * idCount, [1023] * idCount)
+        rospy.sleep()
+        self.dxlProxy.writeRegisters([recoverMsg.dxl_ids], [RAM_TORQUE_ENABLE] * idCount, [1] * idCount)
+        rospy.sleep()
         resp.result = 'success'
+        for id in recoverMsg.dxl_ids:
+            if self.telemDict[id]['error_bits'] != 0:
+                resp.result = 'failure'
+                return resp
+        self.enableExtraTelem(True)
+        if recoverMsg.dxl_ids[0] < 20:
+            self.enableRightArmJointStateTelem(True)
+        else:
+            self.enableLeftArmJointStateTelem(True)
         return resp
 
     def graspCallback(self, graspMsg):

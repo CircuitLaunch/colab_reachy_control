@@ -1,5 +1,4 @@
 #include "Interpolator.hpp"
-#include "ros/ros.h"
 #include <ros/console.h>
 #include <stdio.h>
 #include <string.h>
@@ -17,9 +16,6 @@
 
 #include "BSpline/src/BSpline.hpp"
 #include "BSpline/src/Parametizer.hpp"
-
-using namespace sensor_msgs;
-using namespace std;
 
 unordered_map<string, int> kludgyDXLDict;
 
@@ -44,10 +40,11 @@ void initKludgyDXLDict()
   kludgyDXLDict["l_gripper"] = 27;
 }
 
-Interpolator::Interpolator(DXLPort &iPort, ros::NodeHandle &iNH, const string &iJointStateTopic, const string &iTrajectoryService, vector<string> &iJointNames, uint32_t iQueueSize)
-: port(iPort), nh(iNH),
-  jointStatePub(nh.advertise<JointState>(iJointStateTopic, iQueueSize)),
-  trajectorySrv(nh.advertiseService<Interpolator, colab_reachy_control::Trajectory::Request, colab_reachy_control::Trajectory::Response>(iTrajectoryService, &Interpolator::trajectoryService, this)),
+Interpolator::Interpolator(DXLPort &iPort, NodeHandle &iNH, const string &iSide, vector<string> &iJointNames, uint32_t iQueueSize)
+: port(iPort), nh(iNH), enableJointStateTelemMutex(), enableJointStateTelem(true),
+  jointStatePub(nh.advertise<JointState>(iSide + string("_arm_controller/joint_states"), iQueueSize)),
+  trajectorySrv(nh.advertiseService<Interpolator, Trajectory::Request, Trajectory::Response>(string("action_server/") + iSide + string("_arm_trajectory"), &Interpolator::trajectorySrvCB, this)),
+  enableJointStateTelemSrv(nh.advertiseService<Interpolator, SetBool::Request, SetBool::Response>(iSide + string("_arm_controller/enable_joint_state_telem"), &Interpolator::enableJointStateTelemSrvCB, this)),
   jointNames(iJointNames)
 {
   int i = 8;
@@ -118,7 +115,7 @@ Interpolator::Interpolator(DXLPort &iPort, ros::NodeHandle &iNH, const string &i
 Interpolator::~Interpolator()
 { }
 
-bool Interpolator::trajectoryService(colab_reachy_control::Trajectory::Request &iReq, colab_reachy_control::Trajectory::Response &iRes)
+bool Interpolator::trajectorySrvCB(Trajectory::Request &iReq, Trajectory::Response &iRes)
 {
   #ifdef DEBUG
   ROS_INFO("trajectoryService");
@@ -228,6 +225,26 @@ bool Interpolator::trajectoryService(colab_reachy_control::Trajectory::Request &
   return true;
 }
 
+void Interpolator::enableJointStateTelemetry(bool iEnable)
+{
+  lock_guard<mutex> lg(enableJointStateTelemMutex);
+  enableJointStateTelem = iEnable;
+}
+
+bool Interpolator::isJointStateTelemetryEnabled()
+{
+  lock_guard<mutex> lg(enableJointStateTelemMutex);
+  return enableJointStateTelem;
+}
+
+bool Interpolator::enableJointStateTelemSrvCB(SetBool::Request &iReq, SetBool::Response &oResp)
+{
+  enableJointStateTelemetry(iReq.data);
+  oResp.success = true;
+  oResp.message = iReq.data ? string("joint_state telemetry enabled") : string("joint_state telemetry disabled");
+  return true;
+}
+
 void Interpolator::drive(vector<int> &dxl_ids, float *iJointState)
 {
   // TODO: Use sync write if actually connected to a real controller
@@ -264,8 +281,9 @@ void Interpolator::remapJointState(vector<int> &dxl_ids, float *iJointState)
   }
 }
 
-void Interpolator::timerTick(const ros::TimerEvent &iEvent) const
+void Interpolator::timerTick(const TimerEvent &iEvent)
 {
+  if(!isJointStateTelemetryEnabled()) return;
   JointState jntState;
   jntState.header.stamp = ros::Time::now();
   jntState.name = jointNames;
@@ -277,15 +295,16 @@ void Interpolator::timerTick(const ros::TimerEvent &iEvent) const
   jointStatePub.publish(jntState);
 }
 
-void Interpolator::handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus) const
+void Interpolator::handleError(DXL &iDXL, int iCommResult, uint8_t iErrorStatus, const string &iErrorMsg) const
 {
   string resultString;
   string errorString;
   DXLErrorHandler::resultCodeToString(iCommResult, resultString);
   DXLErrorHandler::errorFlagsToString(iErrorStatus, errorString);
   if(iCommResult != COMM_SUCCESS || iErrorStatus != 0)
-    ROS_INFO("Actuator %d returned comm result: %s, error status: %s",
+    ROS_INFO("Actuator %d returned comm result: %s, error status: %s, error message: %s",
       iDXL.getId(),
       resultString.c_str(),
-      errorString.c_str());
+      errorString.c_str(),
+      iErrorMsg.c_str());
 }

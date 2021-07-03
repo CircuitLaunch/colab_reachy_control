@@ -1,5 +1,7 @@
 #include "DXLCommandServer.hpp"
 
+#include <chrono>
+#include <thread>
 #include <ros/console.h>
 #include <stdio.h>
 #include <string.h>
@@ -8,6 +10,8 @@
 #include <vector>
 
 using namespace std;
+using namespace std::this_thread;
+using namespace std::chrono;
 
 DXLCommandServer::DXLCommandServer(DXLPort &iPort, ros::NodeHandle &iNH)
 : port(iPort), nh(iNH),

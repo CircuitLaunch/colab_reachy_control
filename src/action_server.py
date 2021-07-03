@@ -77,10 +77,12 @@ def actionServerCallback(side, actionServer, goal: FollowJointTrajectoryGoal):
 
     if len(waypoints) < 3:
         if len(waypoints) == 1:
+            rospy.logerr(f'{side}_arm action_server using current pose as initial pose for trajectory')
             with currentPosLock:
                 currentPoints = [currentPos[name] for name in jointNames]
             waypoints.insert(0, currentPoints)
         if len(waypoints) == 2:
+            rospy.logerr(f'{side}_arm action_server creating intermediate waypoint')
             intermed = [(waypoints[0][i] + waypoints[1][i]) * 0.5 for i in range(0, len(waypoints[0]))]
             waypoints.insert(1, intermed)
 
