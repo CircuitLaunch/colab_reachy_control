@@ -68,6 +68,8 @@ add_service_files(
   Grasp.srv
   Recover.srv
   Relax.srv
+  RestPose.srv
+  SetGripperPos.srv
   WriteRegisters.srv
   ReadRegisters.srv
   Trajectory.srv

@@ -85,6 +85,8 @@ class DXLProxy:
             convertedValue = self.fromAngle(id, value)
         if register == RAM_GOAL_POSITION:
             convertedValue = self.fromAngle(id, value * self.polarity(id))
+        if register == RAM_MOVING_SPEED:
+            convertedValue = int(value * 60.0 / self.movingSpeedResolution(id))
         return convertedValue
 
     def convertFromRead(self, id, register, value):
@@ -93,27 +95,34 @@ class DXLProxy:
             convertedValue = self.toAngle(id, value) * self.polarity(id)
         if register in [RAM_GOAL_POSITION, RAM_PRESENT_POSITION]:
             convertedValue = self.toAngle(id, value) * self.polarity(id)
+        if register == RAM_MOVING_SPEED:
+            convertedValue = float(value) * self.movingSpeedResolution(id) / 60.0
         return convertedValue
 
     def fromAngle(self, id, value):
-        return self.centerOffset(id) + (value + self.offset(id)) / self.stepResolution(id)
+        return int(self.centerOffset(id) + (value + self.offset(id)) / self.stepResolution(id))
 
     def toAngle(self, id, value):
-        return (value - self.centerOffset(id)) * self.stepResolution(id) - self.offset(id)
+        return float((value - self.centerOffset(id)) * self.stepResolution(id) - self.offset(id))
 
     def stepResolution(self, id):
-        if id in [10, 20, 11, 21, 13, 23, 15, 25, 16, 26]: # MX
+        if id in [10, 20, 11, 21, 12, 22, 13, 23, 15, 25]: # MX
             return math.radians(0.088)
         #if id in [12, 22, 14, 24, 17, 27]: # AX
         #    pass
         return math.radians(0.29)
 
     def centerOffset(self, id):
-        if id in [10, 20, 11, 21, 13, 23, 15, 25, 16, 26]: # MX
+        if id in [10, 20, 11, 21, 12, 22, 13, 23, 15, 25]: # MX
             return 2048
         #if id in [12, 22, 14, 24, 17, 27]: # AX
         #    pass
         return 512
+
+    def movingSpeedResolution(self, id):
+        if id in [10, 20, 11, 21, 12, 22, 13, 23, 15, 25]:
+            return 0.114
+        return 0.111
 
     def offset(self, id):
         if id in [10, 11]:
