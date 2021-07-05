@@ -33,9 +33,9 @@ class CommandServer:
         resp = ZeroResponse()
         side = zeroMsg.side
         resp.result = 'failure'
-        ids = [10, 11, 12, 13, 14, 15, 16, 17]
+        ids = [10, 11, 12, 13, 14, 15, 16]
         if side == 'left':
-            ids = [20, 21, 22, 23, 24, 25, 26, 27]
+            ids = [20, 21, 22, 23, 24, 25, 26]
         self.dxlProxy.writeRegisters(ids, [RAM_GOAL_POSITION] * 8, [0] * 8)
         resp.result = 'success'
         return resp
@@ -105,7 +105,7 @@ class CommandServer:
     def restPoseCallback(self, restPoseMsg):
         side = restPoseMsg.side
         speed = restPoseMsg.speed
-        ids = [id + (20 if (side == 'left') else 10) for id in range(0, 8)]
+        ids = [id + (20 if (side == 'left') else 10) for id in range(0, 7)]
         # set speed to 0.2 revolutions per second
         cmds = [RAM_MOVING_SPEED] * len(ids)
         vals = [speed] * 8
