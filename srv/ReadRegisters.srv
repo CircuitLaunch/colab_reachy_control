@@ -1,5 +1,5 @@
-byte[] dxl_ids
-byte[] registers
+int32[] dxl_ids
+int32[] registers
 ---
 int32[] values
 float32[] fvalues
