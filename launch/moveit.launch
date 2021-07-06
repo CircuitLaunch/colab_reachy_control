@@ -28,6 +28,8 @@
   <!--
   <node name="auto_recover" pkg="colab_reachy_control" type="auto_recover.py" respawn="true" output="screen" />
   -->
+
+  <node name="compensator" pkg="colab_reachy_calibrate" type="compensator.py" respawn="true" output="screen" />
   
   <node name="interpolator" pkg="colab_reachy_control" type="interpolator" respawn="true" output="screen">
     <param name="device" value="/dev/serial/by-id/usb-Xevelabs_USB2AX_74031303437351011190-if00" />
