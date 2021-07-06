@@ -36,7 +36,7 @@ class CommandServer:
         ids = [10, 11, 12, 13, 14, 15, 16]
         if side == 'left':
             ids = [20, 21, 22, 23, 24, 25, 26]
-        self.dxlProxy.writeRegisters(ids, [RAM_GOAL_POSITION] * 8, [0] * 8)
+        self.dxlProxy.writeRegisters(ids, [RAM_GOAL_POSITION] * 7, [0] * 7)
         resp.result = 'success'
         return resp
 
@@ -140,7 +140,7 @@ class CommandServer:
 
     def relaxCallback(self, relaxMsg):
         side = relaxMsg.side
-        ids = [id + (20 if (side == "left") else 10) for id in range(0, 9)]
+        ids = [id + (20 if (side == "left") else 10) for id in range(0, 7)]
         cmds = [RAM_TORQUE_ENABLE] * len(ids)
         vals = [0] * len(ids)
         self.dxlProxy.writeRegisters(ids, cmds, vals)
