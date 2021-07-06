@@ -13,7 +13,7 @@
 #define DEBUG 0
 #define PASSTHROUGH 0
 #define CONTROL_HZ 30.0
-#define REPORT_HZ 30.0
+#define REPORT_HZ 5.0
 
 using namespace std;
 using namespace ros;
