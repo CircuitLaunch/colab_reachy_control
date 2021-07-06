@@ -134,6 +134,6 @@ class DXLProxy:
         return 0.0
 
     def polarity(self, id):
-        if id in [16, 17, 20, 27]:
+        if id in [16, 20, 27]:
             return 1.0
         return -1.0

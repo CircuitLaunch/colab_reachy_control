@@ -106,11 +106,7 @@ Interpolator::Interpolator(DXLPort &iPort, NodeHandle &iNH, const string &iSide,
           actuator.setPolarity(-1.0);
           break;
         case 27:
-<<<<<<< HEAD
-          ROS_INFO("Setting left gripper polarity to -1");
           actuator.setPolarity(-1.0);
-=======
->>>>>>> c339ffcce5072dbd22bf852698f026efa1f26f49
           break;
       }
     }

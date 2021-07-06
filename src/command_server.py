@@ -79,23 +79,35 @@ class CommandServer:
 
     def graspCallback(self, graspMsg):
         side = graspMsg.side
-        gripperId = 18
-        if side > 20:
-            gripperId = 28
+        gripperId = 17
+        if side == 'left':
+            gripperId = 27
         targetLoad = graspMsg.target_load * 1023.0
         gripperSpeed = graspMsg.gripper_speed / 30.0
-        rate = rospy.Rate(30);
-        gripping = true
+        rate = rospy.Rate(30)
+        gripping = True
         resp = GraspResponse()
         startTime = rospy.Time.now()
+        if side == 'left':
+            presentPosition = 0.7
+        else:
+            presentPosition = -0.7
+            gripperSpeed = -gripperSpeed
+
+        self.dxlProxy.writeRegisters([gripperId, gripperId], [RAM_MOVING_SPEED, RAM_GOAL_POSITION],  [0.2, presentPosition])
+        
         while(gripping and (rospy.Time.now() - startTime) < rospy.Duration(graspMsg.timeout)):
+            # posArray = self.dxlProxy.readRegisters([gripperId], [RAM_PRESENT_POSITION])
+            # presentPosition = posArray[0]
+            # print(presentPosition)
             with self.telemLock:
-                presentPosition = self.telemDict[gripperId]['present_position']
                 presentLoad = self.telemDict[gripperId]['present_load']
+                presentVel = self.telemDict[gripperId]['present_speed']
+            print(f"present load : {presentLoad}, present vel: {presentVel}")
             resp.present_load = presentLoad
             resp.result = "failure"
-            if presentLoad > targetLoad:
-                gripping = false
+            if presentVel == 0 and presentLoad > targetLoad:
+                gripping = False
                 resp.result = "success"
             else:
                 self.dxlProxy.writeRegisters([gripperId], [RAM_GOAL_POSITION], [presentPosition + gripperSpeed])
