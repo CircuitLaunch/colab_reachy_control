@@ -78,6 +78,7 @@ Interpolator::Interpolator(DXLPort &iPort, NodeHandle &iNH, const string &iSide,
           break;
         case 16:
         case 17:
+          actuator.setPolarity(-1.0);
           break;
       }
     } else {
